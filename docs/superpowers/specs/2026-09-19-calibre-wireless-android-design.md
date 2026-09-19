@@ -186,11 +186,16 @@ passwordHash: sha1_hex(password + passwordChallenge)（無密碼則 ""）
 
 ## 10. 後續路線圖（v2+ 候選，2026-09-19 收工時記錄）
 
-功能候選（依價值排序）：
+功能候選（依價值排序）——2026-09-19 v1.2 後狀態：
+- ~~封面縮圖~~ ✅ 已做（本機提取 EPUB/CBZ；calibre 只在 SEND_BOOK 帶 thumbnail，metadata 補推在 9.15 books() 流程被證實不可行，勿再嘗試）
+- ~~刪除標記（原 F1）~~ ❌ 用戶否決（主力單向流，不做刪除理）
+- ~~從 app 拉取選書（Content Server）~~ ❌ 用戶否決（只要本機管理）
+- 裝置分頁 ✅（列表/搜尋/排序/刪除/打開/存儲/與calibre同步）
+- 格式偏好+包長+動畫開關+完成通知+minSdk21 ✅
+剩餘候選：
 1. 閱讀狀態回傳：init 宣告 `isReadSyncCol`/`_is_read_`（協議原生），手機標「讀完」→ calibre 自訂欄同步
-2. harvest 升級：對新檔直接解析 EPUB OPF / PDF 首頁取真實 title/authors（現在是檔名+Unknown）
-3. 封面縮圖：calibre 在 metadata 帶 `thumbnail`（我們已收到但 slim 掉）→ 存檔供裝置視圖
-4. 傳輸完成後的通知（現在只有面板 log）；以及「收件夾新書待入庫 N 本」計數
+2. harvest 升級：PDF 真 metadata（EPUB 已做 OPF）；及「harvest 降為開關」（單向模式下冗余通道）
+3. 待入庫計數（收件夾有書但 calibre 未見）
 5. 開機/連上 Wi-Fi 自動拉起 Service（現在手動開）；以及多伺服器 profile（公司 Mac / 家中 Mac）
 6. 純 Content Server 旁路（方案 A 遺留價值）：calibre 8+ 的 /cdb/add-book 可讓「手機主動拉庫/上傳」成真，與本协议可共存（一個管 calibre-GUI 驅動、一個管手機驅動）
 7. mDNS/Bonjour 探索（calibre 有 publish_zeroconf）作為 UDP 廣播不通時（跨 VLAN）的後備
