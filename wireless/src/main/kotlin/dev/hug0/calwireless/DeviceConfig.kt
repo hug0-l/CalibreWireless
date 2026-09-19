@@ -17,7 +17,7 @@ data class DeviceConfig(
 
 sealed class WirelessEvent {
     object Connecting : WirelessEvent()
-    data class Connected(val libraryName: String?) : WirelessEvent()
+    data class Connected(val libraryName: String?, val deviceUuid: String? = null) : WirelessEvent()
     data class BookReceived(val lpath: String, val size: Long) : WirelessEvent()
     data class BookServed(val lpath: String) : WirelessEvent()
     data class BookDeleted(val lpath: String) : WirelessEvent()

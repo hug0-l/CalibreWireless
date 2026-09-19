@@ -92,7 +92,7 @@ class Session(
             Op.SET_CALIBRE_DEVICE_INFO -> { books.saveDriveInfo(json(f.json)); send(Op.OK) }
             Op.SET_CALIBRE_DEVICE_NAME -> send(Op.OK)
             Op.SET_LIBRARY_INFO -> {
-                emit(WirelessEvent.Connected(json(f.json)["libraryName"]?.jsonPrimitive?.contentOrNull))
+                emit(WirelessEvent.Connected(json(f.json)["libraryName"]?.jsonPrimitive?.contentOrNull, books.deviceUuid()))
                 send(Op.OK)
             }
             Op.DISPLAY_MESSAGE -> {
@@ -180,8 +180,10 @@ class Session(
         send(Op.OK)
         paths.forEach { p ->
             val uuid = if (Lpath.safe(p)) {
-                store.delete(p)
-                books.remove(p) ?: "none"
+                // 只刪書表內認識的書（鏡像 KOReader：不明檔案不动）
+                val removed = books.remove(p)
+                if (removed != null) store.delete(p)
+                removed ?: "none"
             } else "none"
             if (uuid != "none") emit(WirelessEvent.BookDeleted(p))
             send(Op.OK, """{"uuid":"$uuid"}""")
