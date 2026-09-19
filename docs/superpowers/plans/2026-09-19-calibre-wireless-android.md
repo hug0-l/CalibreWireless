@@ -340,3 +340,14 @@ class FakeCalibre(store: InboxStore, config: DeviceConfig, password: String? = n
 - Spec §2「做」逐條有對應 task：握手/六流/eject/密碼 ✅ T5-8；探索/退避 ✅ T9；SAF 書表 ✅ T4+T11；Service/UI ✅ T12-13；錯誤表 7 行 → T5-8/T9/T11/T12 各就位
 - 型別跨 task 一致：Frame/Op/InboxStore/DeviceBooks/WirelessEvent/DeviceConfig 自 T1-5 定義後引用未改名
 - 無佔位：T5 的「handler 佔位回 OK」是顯式過渡（T6-8 逐個充實），FakeCalibre 註解塊為寫法指引而非代碼缺漏
+
+## M2 活體驗證記錄（2026-09-19，calibre 9.15.0 @ Mac）
+
+- 探索：UDP hello → tcp 9091（fixed port）✓
+- 密碼：空 hash 被 DISPLAY_MESSAGE kind1 拒 → PasswordRejected ✓；正確密碼過 ✓
+- SET_LIBRARY_INFO 鍵為 `libraryName`（7.10/9.15 皆然，非 current_library_name）→ 已修正代碼+測試
+- 下行：2 本 epub 共 30MB，size 精確、metadata.calibre 中文 title/authors/tags ✓
+- 退出裝置 → 5s 自動重連 → 再 Connected ✓
+- 上行：手動丟 PDF →（重開裝置會話觸發 GET_BOOK_COUNT）harvest 入列 → 裝置視圖可見
+- 入庫：`GET_BOOK_FILE_SEGMENT` → 庫內 `Xing Ye Biao Zhun - Cai Zhi Gang.pdf` sha1 == 源檔 ✓（用戶於新增對話框改標題作者=行業標準/蔡智剛）
+- 新發現 opcode：GET_COLLECTIONS=21/UPDATE_COLLECTIONS=22（9.15 定義未使用）→ 防禦性應答已加

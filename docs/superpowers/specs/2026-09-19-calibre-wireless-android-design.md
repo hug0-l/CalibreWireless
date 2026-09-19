@@ -91,7 +91,7 @@
 | 3 | GET_DEVICE_INFORMATION | 回 `OK{device_info:{device_store_uuid, device_name}, version, device_version}`；uuid 首見時生成並永久保存（calibre 靠它記裝置） |
 | 4 | TOTAL_SPACE | 回 `OK{total_space_on_device}` |
 | 5 | FREE_SPACE | 回 `OK{free_space_on_device}`（用收件夾所在卷統計） |
-| 6 | GET_BOOK_COUNT `{canStream, canScan, willUseCachedMetadata, supportsSync, canSupportBookFormatSync}` | 回 `OK{count, willStream:false, willScan:false}`，隨後**主動續發** count 條 `OK{priKey, uuid, lpath, last_modified}`（取自書表） |
+| 6 | GET_BOOK_COUNT {canStream, canScan, willUseCachedMetadata, supportsSync, canSupportBookFormatSync} | 回 OK{count, willStream:true, willScan:true}，隨後主動續發 count 條 OK{priKey, uuid, lpath, last_modified}；**應答前先 harvest**：收件夾內未知且副檔名合法的書檔自動入表（最小 metadata，title=檔名）；.calibre 與非法擴展名排除 |
 | 8 | SEND_BOOK `{lpath, length, metadata, thisBook, totalBooks, ...}` | 回 OK（可帶新 lpath）後進 raw 接收態寫檔；失敗回 `ERROR{message}`（calibre≥4.18 認）；寫入前校驗 lpath，寫入後 `metadata.lpath` 以**校驗過的 lpath** 為準入表 |
 | 9 | GET_INITIALIZATION_INFO `{serverProtocolVersion, validExtensions, passwordChallenge, currentLibraryName/UUID, calibre_version, ...}` | 回 OK + init info（見下） |
 | 11 | BOOK_DONE | （新 calibre 用；v1 若收到回 OK 即可，實測決定是否涉及） |
