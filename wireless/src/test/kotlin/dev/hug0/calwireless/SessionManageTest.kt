@@ -1,5 +1,8 @@
 package dev.hug0.calwireless
 
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonObject
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -109,6 +112,48 @@ class SessionManageTest {
             sess.markRead("rd/1.epub", null)
             kotlin.test.assertNull(sess.snapshot().first { it.lpath == "rd/1.epub" }.isRead)
             kotlin.test.assertFalse(sess.markRead("ghost.epub", true))
+        }
+    }
+
+    @Test fun landmineCharsRoundTrip() {
+        val s = store()
+        val nasty = "100% weird #name \"q\" back.epub"
+        val payload = kotlinx.serialization.json.buildJsonObject {
+            put("lpath", nasty); put("length", 2)
+            put("metadata", kotlinx.serialization.json.buildJsonObject {
+                put("uuid", "nm1"); put("lpath", nasty); put("title", "N")
+            })
+        }.toString()
+        FakeCalibre(s).use { fc ->
+            fc.start()
+            fc.call(Op.GET_INITIALIZATION_INFO, "{}")
+            assertEquals(Op.OK, fc.call(Op.SEND_BOOK, payload).opcode)
+            fc.sendRaw(byteArrayOf(1, 2))
+            fc.call(Op.NOOP, "{}")
+            assertEquals(2L, s.size(nasty))
+            assertEquals(nasty, fc.session!!.snapshot().first { it.uuid == "nm1" }.lpath)
+            fc.call(Op.GET_BOOK_COUNT, "{}")
+            val frame = fc.reader.next()!!.json
+            assertTrue(frame.contains("100%"))
+            // 刪除也走得通
+            val del = kotlinx.serialization.json.buildJsonObject {
+                put("lpaths", kotlinx.serialization.json.JsonArray(listOf(kotlinx.serialization.json.JsonPrimitive(nasty))))
+            }.toString()
+            fc.call(Op.DELETE_BOOK, del)
+            fc.reader.next()
+            assertNull(s.size(nasty))
+        }
+    }
+
+    @Test fun harvestDisabledHidesManualFiles() {
+        val s = store()
+        s.write("私人.epub")!!.use { it.write(ByteArray(2)) }
+        val cfg = DeviceConfig(deviceKind = "K", deviceName = "D", harvestEnabled = false)
+        FakeCalibre(s, config = cfg).use { fc ->
+            fc.start()
+            fc.call(Op.GET_INITIALIZATION_INFO, "{}")
+            val rep = fc.call(Op.GET_BOOK_COUNT, "{}")
+            assertTrue(rep.json.contains("\"count\":0"))
         }
     }
 

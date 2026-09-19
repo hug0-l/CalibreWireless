@@ -66,6 +66,12 @@ fun DevicePanelTheme(content: @Composable () -> Unit) {
             onSurfaceVariant = InkDim,
             outline = BorderDim,
             error = Rust,
+            surfaceContainerLow = Color(0xFF1A191D),
+            surfaceContainer = Panel,
+            surfaceContainerHigh = Panel2,
+            surfaceContainerHighest = Color(0xFF2C2B32),
+            secondaryContainer = Color(0xFF2A292F),
+            onSecondaryContainer = Ink,
         ),
     ) { content() }
 }

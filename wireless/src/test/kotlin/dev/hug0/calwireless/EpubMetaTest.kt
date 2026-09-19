@@ -84,6 +84,7 @@ class EpubMetaTest {
         assertEquals("真書名", real["title"]!!.jsonPrimitive.content)
         assertEquals("真作者", real["authors"]!!.jsonArray.first().jsonPrimitive.content)
         assertEquals("S", real["series"]!!.jsonPrimitive.content)
+        assertEquals(2.0, dev.hug0.calwireless.DeviceBookInfo.from(real).seriesIndex)
         assertEquals("fake", byLpath["fake.epub"]!!["title"]!!.jsonPrimitive.content)
         assertEquals("Unknown", byLpath["fake.epub"]!!["authors"]!!.jsonArray.first().jsonPrimitive.content)
         assertEquals("doc", byLpath["doc.pdf"]!!["title"]!!.jsonPrimitive.content) // pdf 不解析 → 檔名

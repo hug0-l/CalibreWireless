@@ -20,6 +20,7 @@ import java.net.Socket
 import java.security.MessageDigest
 
 private val EMPTY_OBJ = JsonObject(emptyMap())
+private fun colKey(name: String): String = if (name.startsWith("#")) name else "#$name"
 private fun sha1Hex(s: String): String =
     MessageDigest.getInstance("SHA-1").digest(s.toByteArray(Charsets.UTF_8))
         .joinToString("") { "%02x".format(it) }
@@ -121,7 +122,15 @@ class Session(
             Op.SET_CALIBRE_DEVICE_INFO -> { books.saveDriveInfo(json(f.json)); send(Op.OK) }
             Op.SET_CALIBRE_DEVICE_NAME -> send(Op.OK)
             Op.SET_LIBRARY_INFO -> {
-                emit(WirelessEvent.Connected(json(f.json)["libraryName"]?.jsonPrimitive?.contentOrNull, books.deviceUuid()))
+                val o = json(f.json)
+                emit(WirelessEvent.Connected(o["libraryName"]?.jsonPrimitive?.contentOrNull, books.deviceUuid()))
+                val fm = o["fieldMetadata"] as? JsonObject
+                if (fm != null) {
+                    fun colsOf(type: String) = fm.entries
+                        .filter { (_, v) -> ((v as? JsonObject)?.get("datatype") as? JsonPrimitive)?.content == type }
+                        .map { it.key }.sorted()
+                    emit(WirelessEvent.LibraryColumns(colsOf("bool"), colsOf("datetime")))
+                }
                 send(Op.OK)
             }
             Op.DISPLAY_MESSAGE -> {
@@ -162,8 +171,8 @@ class Session(
             put("coverHeight", config.coverHeight)
             put("maxBookContentPacketLen", config.maxPacketLen)
             put("useUuidFileNames", false)
-            config.readSyncCol?.takeIf { it.isNotBlank() }?.let { put("isReadSyncCol", it) }
-            config.readDateSyncCol?.takeIf { it.isNotBlank() }?.let { put("isReadDateSyncCol", it) }
+            config.readSyncCol?.takeIf { it.isNotBlank() }?.let { put("isReadSyncCol", colKey(it)) }
+            config.readDateSyncCol?.takeIf { it.isNotBlank() }?.let { put("isReadDateSyncCol", colKey(it)) }
             put("passwordHash", hash)
             put("acceptedExtensions", JsonArray(config.extensions.map { JsonPrimitive(it) }))
             putJsonObject("extensionPathLengths") { config.extensions.forEach { put(it, it.length) } }
@@ -172,7 +181,10 @@ class Session(
     }
 
     private fun onBookCount() {
-        val n = synchronized(booksLock) { books.harvest(config.extensionSet); books.count() }
+        val n = synchronized(booksLock) {
+            if (config.harvestEnabled) books.harvest(config.extensionSet)
+            books.count()
+        }
         send(Op.OK, """{"count":$n,"willStream":true,"willScan":true}""")
         for (i in 1..n) send(Op.OK, synchronized(booksLock) { books.idFrame(i) })
     }

@@ -68,5 +68,32 @@
     <string name="dev_mark">Mark read</string>
     <string name="dev_unmark">Unmark</string>
     <string name="ev_autostart">Auto-start: calibre found</string>
+    <string name="dev_count">%1$d books</string>
+    <string name="st_analysis">STORAGE ANALYSIS</string>
+    <string name="st_books_total">%1$d books · %2$s</string>
+    <string name="st_by_type">By format</string>
+    <string name="st_top5">Largest 5</string>
+    <string name="set_harvest">Phone→library channel (offer new files to calibre)</string>
+    <string name="sel_count">%1$d selected</string>
+    <string name="sel_delete_q">Delete %1$d selected books?</string>
+    <string name="sec_conn">CONNECTION</string>
+    <string name="sec_sync">SYNC</string>
+    <string name="sec_adv">ADVANCED</string>
+    <string name="sec_adv_toggle">Formats, packet size &amp; animation</string>
+    <string name="set_port_short">TCP port</string>
+    <string name="sec_lang">LANGUAGE</string>
+    <string name="lang_system">System</string>
+    <string name="lang_zh">中文</string>
+    <string name="lang_en">English</string>
+    <string name="grp_none">Uncategorized</string>
+    <string name="fil_all">All</string>
+    <string name="fil_read">Read only</string>
+    <string name="fil_unread">Unread only</string>
+    <string name="fil_fmt_all">All formats</string>
+    <string name="disc_scan">Scan local network</string>
+    <string name="disc_scanning">Scanning…</string>
+    <string name="disc_none">No calibre found (is its wireless device server running?)</string>
+    <string name="col_off">Off</string>
+    <string name="hint_fmt_first">Order = priority; first enabled = calibre conversion target</string>
     <string name="chan_name">calibre wireless device</string>
 </resources>

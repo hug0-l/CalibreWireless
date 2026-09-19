@@ -1,43 +1,89 @@
+![CalibreWireless](assets/github-banner.png)
+
 # CalibreWireless
 
-把手機變成 calibre 的「無線裝置」（smart-device 協議，Calibre Companion / KOReader 同款通道）。
-書的往來在 Mac 的 calibre GUI 操作；手機這端只需要開著。
+Turn your Android phone, tablet or e-ink reader into a **wireless calibre device** —
+the same "Android wireless device" protocol calibre uses for connected readers.
+Books flow from your calibre library over the LAN; the phone manages its side locally.
+No cloud, no account, no internet.
 
-## 需求
+> **How it works:** calibre's smart-device protocol is *host-driven* — calibre is the
+> master and the app is the emulated device (like a USB stick that happens to live on
+> your Wi-Fi). Pushing books happens in calibre's GUI; the phone app keeps the
+> connection alive, receives books, serves files back, and gives you a local book
+> manager with covers, series shelves, storage analytics and read-status sync.
 
-- Mac calibre ≥ 7.10（實測 9.15.0）。calibre → 偏好設定 → 搜尋「裝置」→ 找到
-  「Android 無線裝置 / Smart device」驅動設定：勾 **啟動時允許連線**、
-  （建議）固定連接埠、可設密碼
-- 手機與 Mac 同一區域網路
+## Screenshots
 
-## 使用
+| Status panel | Device library |
+|---|---|
+| ![status](assets/screenshots/status.png) | ![device](assets/screenshots/device.png) |
 
-1. 安裝 `app-debug.apk`（`./gradlew :app:assembleDebug` 產出）
-2. app 內：選收件夾（如 `Books`）→ 設定（自動探索即可；有密碼填密碼）
-3. 開主開關 → 面板綠燈 = calibre 已把手機當裝置
-4. 收書：calibre 選書 → 發送到裝置 → 落進收件夾
-5. 交書：把檔丟進收件夾 → calibre **退出裝置** → 等 10 秒自動重連 → 裝置視圖見新書 → 拖回書庫（或「將書本新增至書庫」）
+## Features
 
-## 閱讀狀態同步（可選）
+- **Wireless device emulation** — calibre smart-device protocol (JSON over TCP,
+  `<len>[opcode, payload]` framing, UDP discovery, optional password auth via
+  `sha1(password + challenge)`), verified against calibre 7.10 → 9.15 source
+- **Receive books** from calibre's *Send to device* — straight into your chosen
+  inbox folder (SAF), with zombie-tail-proof metadata
+- **Offer books to the library** — drop files into the inbox and they appear in
+  calibre's device view (EPUB OPF / PDF docinfo metadata parsed locally)
+- **Local book manager** — list / cover grid / series shelf views, search, sort,
+  multi-select (long-press), delete, open-in-reader, storage bar + analytics
+  (by format, largest books)
+- **Read-status sync** — mark books read on the device; calibre writes it into a
+  Yes/No custom column (and a date column), and pushes it back on send
+- **Covers** — extracted locally from the books themselves (EPUB/CBZ), no server needed
+- **Connection UX** — auto-discovery (or scan-and-pick / manual host:port), fixed-port
+  support, auto-start when calibre is found on boot/network change, wake + Wi-Fi locks,
+  transfer notifications, reconnect with backoff
+- **i18n** — 繁體中文 / English, switchable in-app (or follow system)
+- Warm-graphite device-panel UI with LED status; animation toggle for e-ink
 
-1. calibre → 偏好設定 → 添加自訂欄位：類型的選 **是/否**、名稱例如 `read`（要日期再加一個 **日期** 欄 `read_date`）
-2. app 設定 → 「已讀同步欄位」填 `read`（不含 #）→ 重啟服務
-3. 裝置分頁點「標已讀」→ 下次 calibre 連線/同步時寫入書庫自訂欄；書庫端勾選也會在推送時帶到裝置
-（欄位不存在時 calibre 會彈提示，不影響其他同步）
+## Requirements
 
-## 自動啟動
+- **Mac/PC:** calibre ≥ 7.10 (tested through 9.15) on the same LAN
+- **Phone:** Android 5.0+ (API 21) — built for old e-ink readers too
 
-設定 → 「發現 calibre 時自動啟動」：開機與網路變化時靜默探測 UDP hello，找到才拉起服務（換 Wi-Fi 到公司自動變待機）。Android 12+ 可能擋背景拉起，被擋時手動開一次即可。
+## Setup (calibre side)
 
-## 開發
+1. Preferences → **Sharing over the net** → enable *Android wireless device access*
+   (the "smart device" driver): tick **Enable connections at startup**, optionally set a
+   **fixed port** and a **security password**
+2. (Optional, for read-status sync) add a custom column: type **Yes/No**, name e.g. `read`
+   (and a `Date` one for read dates)
+3. Keep calibre running — the device appears in the toolbar when the app connects
 
-- `:wireless` 純 JVM 協議引擎（測試全在此層：FakeCalibre 劇本 48 測）
-- `:app` Android 外殼（SAF 收件夾 + 前台 Service + Compose 面板）
-- 除錯 CLI：`./gradlew :wireless:installDist && ./wireless/build/install/wireless/bin/wireless --inbox /tmp/x --password …`
-- 文件：`docs/superpowers/specs/`（協議規格 §4 為源碼實測）、`docs/superpowers/plans/`（實施計劃 + M2 實測記錄）
+## Setup (app side)
 
-## 協議速記（源碼實測 calibre v7.10/9.15 driver.py）
+1. Install the APK from [Releases](../../releases)
+2. Pick an **inbox folder** (any folder readable by other apps — readers included)
+3. Settings → password if you set one → keep **auto-discover** on
+4. Flip the switch. Green LED = calibre sees the device
 
-TCP JSON 幀 `<十進位長度>[opcode, {…}]`；calibre 單向鎖步驅動；
-SET_LIBRARY_INFO 用 `libraryName`；探索 = UDP "hello" → {54982,48123,39001,44044,59678}；
-密碼 = `sha1(password + challenge)`；one-way 訊息（SEND_BOOKLISTS / SEND_BOOK_METADATA / NOOP{count}）不得應答。
+**Send books:** select in calibre → *Send to device*.
+**Add books to library:** copy files into the inbox → device icon → *Eject* →
+the app reconnects in ~5 s → open device view → drag books to the library tab.
+**After deleting in the app:** press *Sync with calibre* (reconnects so the device
+view refreshes — the protocol has no live device→calibre notifications).
+
+## Build
+
+```
+sdkmanager "platforms;android-35" "build-tools;35.0.0"
+./gradlew :app:assembleRelease      # app/build/outputs/apk/release/
+./gradlew :wireless:test            # 71 protocol/engine tests (JVM, no device needed)
+```
+
+Protocol reference and design docs: `docs/superpowers/specs/` +
+`docs/protocol-notes.md` (ground truth: `src/calibre/devices/smart_device_app/driver.py`).
+
+## Privacy
+
+Everything stays on your LAN. The app stores only connection settings, the device
+serial (so calibre recognises it) and cached cover thumbnails.
+
+## License
+
+MIT (protocol knowledge belongs to everyone; the implementation is original —
+KOReader's plugin was used as a behavioural reference only).

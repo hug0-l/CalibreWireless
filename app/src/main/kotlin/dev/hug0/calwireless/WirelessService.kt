@@ -31,6 +31,29 @@ class WirelessService : Service() {
             stopSelf()
             return START_NOT_STICKY
         }
+        val s = if (intent == null) {
+            // sticky 重啟：從持久化設定自我重建
+            val saved = readSettings(this)
+            if (!saved.ready()) {
+                stopSelf()
+                return START_NOT_STICKY
+            }
+            saved
+        } else {
+            Settings(
+                auto = intent.getBooleanExtra(EXTRA_AUTO, true),
+                host = intent.getStringExtra(EXTRA_HOST).orEmpty(),
+                port = intent.getIntExtra(EXTRA_PORT, 8135),
+                password = intent.getStringExtra(EXTRA_PASSWORD).orEmpty(),
+                name = intent.getStringExtra(EXTRA_NAME).orEmpty().ifEmpty { "CalibreWireless" },
+                tree = intent.getStringExtra(EXTRA_TREE).orEmpty(),
+                formats = intent.getStringExtra(EXTRA_FORMATS) ?: DeviceConfig.DEFAULT_FORMATS.joinToString(","),
+                packet = intent.getIntExtra(EXTRA_PACKET, 65536),
+                readCol = intent.getStringExtra(EXTRA_READ_COL).orEmpty(),
+                dateCol = intent.getStringExtra(EXTRA_DATE_COL).orEmpty(),
+                harvest = intent.getBooleanExtra(EXTRA_HARVEST, true),
+            )
+        }
         createChannel()
         startForeground(NOTIF_ID, buildNotification())
         stopped = false
@@ -41,57 +64,50 @@ class WirelessService : Service() {
             activeSession?.takeIf { it.alive }?.let { it.markRead(lp, r) }?.also { pushBooks() } ?: false
         }
         DeviceState.resyncFun = { try { currentSocket?.close() } catch (e: Exception) {} }
-
-        val auto = intent?.getBooleanExtra(EXTRA_AUTO, true) ?: true
-        val host = intent?.getStringExtra(EXTRA_HOST).orEmpty()
-        val port = intent?.getIntExtra(EXTRA_PORT, 0) ?: 0
-        val password = intent?.getStringExtra(EXTRA_PASSWORD).orEmpty().ifEmpty { null }
-        val deviceName = intent?.getStringExtra(EXTRA_NAME).orEmpty().ifEmpty { "CalibreWireless" }
-        val readCol = intent?.getStringExtra(EXTRA_READ_COL).orEmpty().ifEmpty { null }
-        val dateCol = intent?.getStringExtra(EXTRA_DATE_COL).orEmpty().ifEmpty { null }
-        val formats = DeviceConfig.parseFormats(intent?.getStringExtra(EXTRA_FORMATS))
-        val packet = (intent?.getIntExtra(EXTRA_PACKET, 65536) ?: 65536).coerceIn(1024, 1 shl 20)
-        val treeUriStr = intent?.getStringExtra(EXTRA_TREE)
-        val tree = treeUriStr?.let { Uri.parse(it) }
-
-        if (tree == null) {
+        if (s.tree.isEmpty()) {
             DeviceState.status.value = Status.IDLE
             DeviceState.log(R.string.log_no_folder, kind = LogKind.ERR)
             stopSelf()
             return START_NOT_STICKY
         }
+        startWorker(s)
+        return START_STICKY
+    }
 
+    private fun startWorker(s: Settings) {
         val config = DeviceConfig(
             deviceKind = android.os.Build.MODEL,
-            deviceName = "$deviceName (${android.os.Build.MODEL})",
-            extensions = formats,
-            maxPacketLen = packet,
-            readSyncCol = readCol,
-            readDateSyncCol = dateCol,
+            deviceName = "${s.name} (${android.os.Build.MODEL})",
+            extensions = DeviceConfig.parseFormats(s.formats),
+            maxPacketLen = s.packet.coerceIn(1024, 1 shl 20),
+            readSyncCol = s.readCol.ifEmpty { null },
+            readDateSyncCol = s.dateCol.ifEmpty { null },
+            harvestEnabled = s.harvest,
         )
         worker = Thread {
             val address: () -> Pair<String, Int>? = when {
-                auto -> { { Discover.hello()?.let { it.address to it.tcpPort } } }
-                else -> { { host to port } }
+                s.auto -> {
+                    { Discover.hello()?.let { it.address to it.tcpPort } }
+                }
+                else -> { { s.host to s.port } }
             }
             WirelessDevice(
-                store = SafInboxStore(applicationContext, tree),
+                store = SafInboxStore(applicationContext, Uri.parse(s.tree)),
                 config = config,
-                password = password,
+                password = s.password.ifEmpty { null },
                 addressProvider = address,
                 emit = ::onEvent,
-                socketFactory = { h, p ->
-                    Socket().also { s ->
-                        currentSocket = s
-                        s.connect(java.net.InetSocketAddress(h, p), 5000)
-                        s.tcpNoDelay = true
-                    }
-                },
                 onSession = { activeSession = it },
                 coverSink = FileCoverSink(applicationContext),
+                socketFactory = { h, p ->
+                    Socket().also { sk ->
+                        currentSocket = sk
+                        sk.connect(java.net.InetSocketAddress(h, p), 5000)
+                        sk.tcpNoDelay = true
+                    }
+                },
             ).runLoop { stopped }
         }.also { it.isDaemon = true; it.start() }
-        return START_STICKY
     }
 
     @Suppress("DEPRECATION")
@@ -142,15 +158,21 @@ class WirelessService : Service() {
             is WirelessEvent.Busy -> { DeviceState.status.value = Status.BUSY; DeviceState.log(R.string.ev_busy, e.otherDevice, LogKind.WARN) }
             is WirelessEvent.Ejected -> { DeviceState.status.value = Status.EJECTED; DeviceState.log(R.string.ev_ejected, kind = LogKind.WARN) }
             is WirelessEvent.Disconnected -> { DeviceState.status.value = Status.RETRY; DeviceState.log(R.string.ev_disconnected, e.cause, LogKind.WARN) }
+            is WirelessEvent.LibraryColumns -> {
+                DeviceState.cols.value = e.boolCols
+                DeviceState.dateCols.value = e.dateCols
+            }
             is WirelessEvent.Log -> DeviceState.logRaw(e.message)
         }
         (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager)
             .notify(NOTIF_ID, buildNotification())
     }
 
-    private fun buildNotification(): Notification = Notification.Builder(this, CHANNEL)
-        .setContentTitle(getString(R.string.app_name))
-        .setContentText(statusText(this, DeviceState.status.value))
+    private fun buildNotification(): Notification {
+        val lc = localized()
+        return Notification.Builder(this, CHANNEL)
+        .setContentTitle(lc.getString(R.string.app_name))
+        .setContentText(statusText(lc, DeviceState.status.value))
         .setSmallIcon(android.R.drawable.ic_popup_sync)
         .setContentIntent(
             PendingIntent.getActivity(
@@ -160,6 +182,7 @@ class WirelessService : Service() {
         )
         .setOngoing(true)
         .build()
+    }
 
     private fun createChannel() {
         val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -211,5 +234,6 @@ class WirelessService : Service() {
         const val EXTRA_PACKET = "packet"
         const val EXTRA_READ_COL = "read_col"
         const val EXTRA_DATE_COL = "date_col"
+        const val EXTRA_HARVEST = "harvest"
     }
 }

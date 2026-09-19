@@ -19,6 +19,9 @@ object DeviceState {
     val deviceUuid = MutableStateFlow<String?>(null)
     val logs = MutableStateFlow<List<LogLine>>(emptyList())
     val books = MutableStateFlow<List<DeviceBookInfo>>(emptyList())
+    val booksCount = MutableStateFlow(0)
+    val cols = MutableStateFlow<List<String>>(emptyList())
+    val dateCols = MutableStateFlow<List<String>>(emptyList())
     @Volatile var deleteFun: ((String) -> Boolean)? = null
     @Volatile var markFun: ((String, Boolean?) -> Boolean)? = null
     @Volatile var resyncFun: (() -> Unit)? = null

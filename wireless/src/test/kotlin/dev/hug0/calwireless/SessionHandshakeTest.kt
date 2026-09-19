@@ -90,6 +90,17 @@ class SessionHandshakeTest {
         }
     }
 
+    @Test fun fieldMetadataEmitsColumns() {
+        FakeCalibre(store()).use { fc ->
+            fc.start()
+            fc.initHandshake()
+            fc.call(Op.SET_LIBRARY_INFO, """{"libraryName":"L","fieldMetadata":{"#read":{"datatype":"bool"},"#fin":{"datatype":"datetime"},"tags":{"datatype":"text"},"#n":{"datatype":"number"}}}""")
+            val ev = fc.events.filterIsInstance<WirelessEvent.LibraryColumns>().first()
+            assertEquals(listOf("#read"), ev.boolCols)
+            assertEquals(listOf("#fin"), ev.dateCols)
+        }
+    }
+
     @Test fun keepaliveThenEjectEndsSession() {
         FakeCalibre(store()).use { fc ->
             fc.start()
@@ -137,8 +148,8 @@ class SessionHandshakeTest {
         FakeCalibre(store(), config = cfg).use { fc ->
             fc.start()
             val o = Json.parseToJsonElement(fc.initHandshake().json).jsonObject
-            assertEquals("read", o["isReadSyncCol"]!!.jsonPrimitive.content)
-            assertEquals("read_date", o["isReadDateSyncCol"]!!.jsonPrimitive.content)
+            assertEquals("#read", o["isReadSyncCol"]!!.jsonPrimitive.content)
+            assertEquals("#read_date", o["isReadDateSyncCol"]!!.jsonPrimitive.content)
         }
         FakeCalibre(store()).use { fc ->
             fc.start()
