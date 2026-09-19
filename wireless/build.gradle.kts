@@ -1,6 +1,12 @@
 plugins {
     kotlin("jvm")
     kotlin("plugin.serialization")
+    application
+}
+
+application {
+    mainClass.set("dev.hug0.calwireless.CliKt")
+    applicationName = "wireless"
 }
 
 dependencies {
