@@ -26,12 +26,50 @@ class DeviceBooks(private val store: InboxStore) {
         try {
             books.addAll(Json.parseToJsonElement(raw).jsonArray.map { it.jsonObject })
         } catch (e: Exception) {
-            books.clear()
+            // 殭屍尾巴自愈：舊版 SAF 未截斷留下的拼接檔，撈出第一個完整陣列重試
+            val salvaged = firstJsonArray(raw.trim())
+            try {
+                if (salvaged != null) {
+                    books.addAll(Json.parseToJsonElement(salvaged).jsonArray.map { it.jsonObject })
+                    saveNow() // 立刻重寫乾淨檔
+                }
+            } catch (e2: Exception) {
+                books.clear()
+            }
         }
         prune()
     }
 
-    fun save() {
+    private fun firstJsonArray(raw: String): String? {
+        if (!raw.startsWith("[")) return null
+        var depth = 0
+        var inStr = false
+        var esc = false
+        for (i in raw.indices) {
+            val c = raw[i]
+            if (inStr) {
+                when {
+                    esc -> esc = false
+                    c == '\\' -> esc = true
+                    c == '"' -> inStr = false
+                }
+                continue
+            }
+            when (c) {
+                '"' -> inStr = true
+                '[' -> depth++
+                ']' -> {
+                    depth--
+                    if (depth == 0) return raw.substring(0, i + 1)
+                }
+            }
+        }
+        return null
+    }
+
+    fun save() = saveNow()
+
+    private fun saveNow() {
         store.writeText(META_FILE, JsonArray(books.map { it as JsonElement }).toString())
     }
 
@@ -79,6 +117,8 @@ class DeviceBooks(private val store: InboxStore) {
     }
 
     fun frame(index1Based: Int): String = books[index1Based - 1].toString()
+
+    fun infos(): List<DeviceBookInfo> = books.map { DeviceBookInfo.from(it) }
 
     fun prune() {
         val existing = store.list().toHashSet()

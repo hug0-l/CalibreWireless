@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.annotation.StringRes
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
+import dev.hug0.calwireless.DeviceBookInfo
 import kotlinx.coroutines.flow.MutableStateFlow
 
 enum class LogKind { INFO, OK, WARN, ERR }
@@ -17,6 +18,9 @@ object DeviceState {
     val library = MutableStateFlow<String?>(null)
     val deviceUuid = MutableStateFlow<String?>(null)
     val logs = MutableStateFlow<List<LogLine>>(emptyList())
+    val books = MutableStateFlow<List<DeviceBookInfo>>(emptyList())
+    @Volatile var deleteFun: ((String) -> Boolean)? = null
+    @Volatile var resyncFun: (() -> Unit)? = null
 
     private val fmt = DateTimeFormatter.ofPattern("HH:mm:ss")
 

@@ -97,6 +97,19 @@ class DeviceBooksTest {
         assertEquals(2, db2.count())
     }
 
+    @Test fun salvagesZombieTail() {
+        val s = store()
+        s.write("a/A.epub")!!.use { it.write(ByteArray(1)) }
+        val good = """[{"uuid":"u1","lpath":"a/A.epub","title":"甲","last_modified":"L","size":1}]"""
+        s.writeText(DeviceBooks.META_FILE, good + """ 07 - junk (2317).epub","last_modified":"x"}]""") // 拼接殭屍尾巴
+        val db = DeviceBooks(s).apply { load() }
+        assertEquals(1, db.count())
+        assertEquals("u1", db.uuidOf("a/A.epub"))
+        db.save() // 重寫後應為乾淨 JSON
+        val db2 = DeviceBooks(s).apply { load() }
+        assertEquals(1, db2.count())
+    }
+
     @Test fun deviceUuidStableAcrossReloads() {
         val s = store()
         val db = DeviceBooks(s)

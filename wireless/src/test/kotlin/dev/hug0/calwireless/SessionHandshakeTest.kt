@@ -36,7 +36,7 @@ class SessionHandshakeTest {
             assertTrue(o["canSendOkToSendbook"]!!.jsonPrimitive.content.toBoolean())
             assertTrue(o["canAcceptLibraryInfo"]!!.jsonPrimitive.content.toBoolean())
             assertEquals("", o["passwordHash"]!!.jsonPrimitive.content)
-            assertEquals(4096, o["maxBookContentPacketLen"]!!.jsonPrimitive.content.toInt())
+            assertEquals(65536, o["maxBookContentPacketLen"]!!.jsonPrimitive.content.toInt())
             assertEquals(4, o["acceptedExtensions"]!!.jsonArray.first().jsonPrimitive.content.length)
             assertEquals(4, o["extensionPathLengths"]!!.jsonObject["epub"]!!.jsonPrimitive.content.toInt())
             assertNotNull(o["ccVersionNumber"])
@@ -115,6 +115,20 @@ class SessionHandshakeTest {
             // 模擬 calibre 發現密碼錯：推 DISPLAY_MESSAGE kind1 後斷線
             fc.call(Op.DISPLAY_MESSAGE, """{"messageKind":1}""")
             assertTrue(fc.events.filterIsInstance<WirelessEvent.PasswordRejected>().isNotEmpty())
+        }
+    }
+
+    @Test fun customFormatOrderAndPacketPassThrough() {
+        val cfg = DeviceConfig(
+            deviceKind = "EInk", deviceName = "Reader",
+            maxPacketLen = 32768, extensions = listOf("azw3", "epub", "pdf"),
+        )
+        FakeCalibre(store(), config = cfg).use { fc ->
+            fc.start()
+            val o = Json.parseToJsonElement(fc.initHandshake().json).jsonObject
+            assertEquals("azw3", o["acceptedExtensions"]!!.jsonArray.first().jsonPrimitive.content)
+            assertEquals(4, o["extensionPathLengths"]!!.jsonObject["azw3"]!!.jsonPrimitive.content.toInt())
+            assertEquals(32768, o["maxBookContentPacketLen"]!!.jsonPrimitive.content.toInt())
         }
     }
 

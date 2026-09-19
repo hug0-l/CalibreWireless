@@ -38,8 +38,29 @@
     <string name="set_port">TCP port (calibre fixed port)</string>
     <string name="set_password">Password (if set in calibre)</string>
     <string name="set_name">Device name</string>
+    <string name="set_formats">Accepted formats (comma; first = conversion target)</string>
+    <string name="set_packet">Transfer packet size (bytes)</string>
+    <string name="set_anim">Pulse animation</string>
+    <string name="chan_transfer">Transfer finished</string>
     <string name="set_save">Save</string>
     <string name="set_cancel">Cancel</string>
 
+    <string name="tab_status">Status</string>
+    <string name="tab_device">Device</string>
+    <string name="dev_search">Filter</string>
+    <string name="dev_sort_title">Title</string>
+    <string name="dev_sort_author">Author</string>
+    <string name="dev_sort_series">Series</string>
+    <string name="dev_sort_size">Size</string>
+    <string name="dev_open">Open</string>
+    <string name="dev_delete">Delete</string>
+    <string name="dev_delete_q">Delete "%1$s"?</string>
+    <string name="dev_delete_note">Removes from the phone only. Press Sync so calibre refetches the device list.</string>
+    <string name="dev_sync">Sync with calibre</string>
+    <string name="dev_sync_hint">Sync works while the service runs: it reconnects to refresh calibre\'s view</string>
+    <string name="dev_empty">No books on device</string>
+    <string name="dev_storage">used %1$s · free %2$s</string>
+    <string name="dev_open_fail">No app can open %1$s</string>
+    <string name="dev_no_tree">Pick an inbox folder on the Status tab first</string>
     <string name="chan_name">calibre wireless device</string>
 </resources>

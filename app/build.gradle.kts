@@ -10,7 +10,7 @@ android {
     compileSdk = 35
     defaultConfig {
         applicationId = "dev.hug0.calwireless"
-        minSdk = 26
+        minSdk = 21
         targetSdk = 35
         versionCode = 1
         versionName = "0.1"
@@ -23,6 +23,7 @@ android {
         }
     }
     compileOptions {
+        isCoreLibraryDesugaringEnabled = true
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
@@ -41,4 +42,5 @@ dependencies {
     implementation("androidx.datastore:datastore-preferences:1.1.1")
     implementation("androidx.core:core-ktx:1.15.0")
     implementation("androidx.documentfile:documentfile:1.0.1")
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.3")
 }

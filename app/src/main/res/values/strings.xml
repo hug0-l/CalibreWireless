@@ -38,8 +38,29 @@
     <string name="set_port">TCP 埠（calibre 固定連接埠）</string>
     <string name="set_password">密碼（若 calibre 有設）</string>
     <string name="set_name">裝置顯示名</string>
+    <string name="set_formats">支援格式（逗號，第一項＝calibre 轉檔目標）</string>
+    <string name="set_packet">傳輸包長（位元組）</string>
+    <string name="set_anim">脈動動畫</string>
+    <string name="chan_transfer">傳輸完成</string>
     <string name="set_save">儲存</string>
     <string name="set_cancel">取消</string>
 
+    <string name="tab_status">狀態</string>
+    <string name="tab_device">裝置</string>
+    <string name="dev_search">搜尋</string>
+    <string name="dev_sort_title">標題</string>
+    <string name="dev_sort_author">作者</string>
+    <string name="dev_sort_series">系列</string>
+    <string name="dev_sort_size">大小</string>
+    <string name="dev_open">打開</string>
+    <string name="dev_delete">刪除</string>
+    <string name="dev_delete_q">刪除「%1$s」？</string>
+    <string name="dev_delete_note">僅從手機移除；按「與 calibre 同步」讓 calibre 重抓裝置清單。</string>
+    <string name="dev_sync">與 calibre 同步</string>
+    <string name="dev_sync_hint">同步鈕於服務運行時可用：斷線重連以刷新 calibre 視圖</string>
+    <string name="dev_empty">裝置上沒有書</string>
+    <string name="dev_storage">已用 %1$s · 剩餘 %2$s</string>
+    <string name="dev_open_fail">沒有 app 能開啟 %1$s</string>
+    <string name="dev_no_tree">請先在「狀態」頁選取收件夾</string>
     <string name="chan_name">calibre 無線裝置</string>
 </resources>

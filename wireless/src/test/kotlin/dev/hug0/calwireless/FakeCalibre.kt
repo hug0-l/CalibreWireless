@@ -11,10 +11,13 @@ class FakeCalibre(
     private val store: InboxStore,
     private val config: DeviceConfig = DeviceConfig(deviceKind = "TestKind", deviceName = "TestDevice"),
     private val password: String? = null,
+    private val coverSink: CoverSink? = null,
 ) : AutoCloseable {
     private val server = ServerSocket(0)
     private var serverSock: Socket? = null
     private var sessionThread: Thread? = null
+    @Volatile var session: Session? = null
+        private set
     lateinit var reader: FrameReader
         private set
     lateinit var raw: DataInputStream
@@ -27,7 +30,9 @@ class FakeCalibre(
         val t = Thread {
             val s = Socket("localhost", server.localPort)
             s.tcpNoDelay = true
-            Session(s, store, config, password) { e -> events.add(e) }.run()
+            val sess = Session(s, store, config, password, { e -> events.add(e) }, coverSink)
+            session = sess
+            sess.run()
         }
         t.isDaemon = true
         sessionThread = t

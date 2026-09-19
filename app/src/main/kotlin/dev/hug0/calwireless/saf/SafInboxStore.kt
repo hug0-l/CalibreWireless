@@ -46,6 +46,8 @@ class SafInboxStore(
 
     override fun delete(path: String): Boolean = findByRel(path)?.delete() ?: false
 
+    fun uriFor(rel: String): Uri? = findByRel(rel)?.uri
+
     override fun read(path: String): InputStream? =
         try { findByRel(path)?.let { context.contentResolver.openInputStream(it.uri) } } catch (e: Exception) { null }
 
@@ -66,7 +68,7 @@ class SafInboxStore(
             // octet-stream + 帶點全名：ExternalStorageProvider 原樣保留檔名（T14 實機核）
             doc = parent.createFile("application/octet-stream", name) ?: return null
         }
-        return try { context.contentResolver.openOutputStream(doc.uri, "w") } catch (e: Exception) { null }
+        return try { context.contentResolver.openOutputStream(doc.uri, "wt") } catch (e: Exception) { null }
     }
 
     override fun readText(path: String): String? =

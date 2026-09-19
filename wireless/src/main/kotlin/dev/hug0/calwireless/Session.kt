@@ -30,16 +30,21 @@ class Session(
     private val config: DeviceConfig,
     private val password: String?,
     private val emit: (WirelessEvent) -> Unit = {},
+    private val coverSink: CoverSink? = null,
 ) {
     private val input = socket.getInputStream()
     private val output = socket.getOutputStream()
     private val reader = FrameReader(input)
     private val books = DeviceBooks(store)
+    val booksLock = Any()
+    @Volatile var alive = false
+        private set
     @Volatile private var ejecting = false
     private var endEvent: WirelessEvent = WirelessEvent.Disconnected("socket closed")
 
     fun run() {
-        books.load()
+        synchronized(booksLock) { books.load() }
+        alive = true
         while (!ejecting) {
             val f = try { reader.next() } catch (e: Exception) { null } ?: break
             try {
@@ -49,7 +54,21 @@ class Session(
                 break
             }
         }
+        alive = false
         emit(endEvent)
+    }
+
+    /** UI 管理入口：只刪表內認識的書，不動 calibre 通道（視圖靠重連刷新） */
+    fun deleteBook(lpath: String): Boolean = synchronized(booksLock) {
+        if (books.uuidOf(lpath) == "none") return false
+        val ok = store.delete(lpath)
+        books.remove(lpath)
+        books.save()
+        ok
+    }
+
+    fun snapshot(): List<DeviceBookInfo> = synchronized(booksLock) {
+        books.books.map { DeviceBookInfo.from(it) }
     }
 
     private fun json(s: String): JsonObject =
@@ -87,7 +106,10 @@ class Session(
             Op.GET_BOOK_METADATA -> send(Op.OK, books.frame(json(f.json)["index"]!!.jsonPrimitive.int))
             Op.SEND_BOOKLISTS -> { /* one-way: calibre 不等應答 */ }
             Op.SEND_BOOK_METADATA -> {
-                json(f.json)["data"]?.jsonObject?.let { books.update(it); books.save() }
+                json(f.json)["data"]?.jsonObject?.let { m ->
+                m["lpath"]?.jsonPrimitive?.contentOrNull?.let { stashCover(m, it) }
+                synchronized(booksLock) { books.update(m); books.save() }
+            }
             }
             Op.SET_CALIBRE_DEVICE_INFO -> { books.saveDriveInfo(json(f.json)); send(Op.OK) }
             Op.SET_CALIBRE_DEVICE_NAME -> send(Op.OK)
@@ -141,9 +163,9 @@ class Session(
     }
 
     private fun onBookCount() {
-        books.harvest(config.extensionSet)
-        send(Op.OK, """{"count":${books.count()},"willStream":true,"willScan":true}""")
-        for (i in 1..books.count()) send(Op.OK, books.idFrame(i))
+        val n = synchronized(booksLock) { books.harvest(config.extensionSet); books.count() }
+        send(Op.OK, """{"count":$n,"willStream":true,"willScan":true}""")
+        for (i in 1..n) send(Op.OK, synchronized(booksLock) { books.idFrame(i) })
     }
 
     private fun onSendBook(req: String) {
@@ -170,8 +192,8 @@ class Session(
             try { out?.close() } catch (e: Exception) {}
         }
         if (out == null) { emit(WirelessEvent.Log("write failed: $lpath")); return }
-        books.upsert(meta, lpath)
-        books.save()
+        stashCover(meta, lpath)
+        synchronized(booksLock) { books.upsert(meta, lpath); books.save() }
         emit(WirelessEvent.BookReceived(lpath, length))
     }
 
@@ -179,8 +201,7 @@ class Session(
         val paths = json(req)["lpaths"]?.jsonArray?.mapNotNull { it.jsonPrimitive.contentOrNull } ?: emptyList()
         send(Op.OK)
         paths.forEach { p ->
-            val uuid = if (Lpath.safe(p)) {
-                // 只刪書表內認識的書（鏡像 KOReader：不明檔案不动）
+            val uuid = if (Lpath.safe(p)) synchronized(booksLock) {
                 val removed = books.remove(p)
                 if (removed != null) store.delete(p)
                 removed ?: "none"
@@ -206,6 +227,16 @@ class Session(
             output.flush()
         }
         emit(WirelessEvent.BookServed(lpath))
+    }
+
+    private fun stashCover(meta: JsonObject, lpath: String) {
+        val sink = coverSink ?: return
+        val t = meta["thumbnail"] as? kotlinx.serialization.json.JsonArray ?: return
+        if (t.size < 3) return
+        val b64 = t[2].jsonPrimitive.contentOrNull ?: return
+        val w = t[0].jsonPrimitive.intOrNull ?: 0
+        val h = t[1].jsonPrimitive.intOrNull ?: 0
+        try { sink.put(lpath, b64, w, h) } catch (e: Exception) {}
     }
 
     private fun onNoop(req: String) {

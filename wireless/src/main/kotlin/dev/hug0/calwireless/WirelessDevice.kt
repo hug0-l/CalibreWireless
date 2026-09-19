@@ -9,6 +9,8 @@ class WirelessDevice(
     private val password: String?,
     private val addressProvider: () -> Pair<String, Int>?,
     private val emit: (WirelessEvent) -> Unit = {},
+    private val onSession: (Session) -> Unit = {},
+    private val coverSink: CoverSink? = null,
     private val socketFactory: (String, Int) -> Socket = { h, p ->
         Socket(InetAddress.getByName(h), p).apply { tcpNoDelay = true }
     },
@@ -30,7 +32,9 @@ class WirelessDevice(
             val startedAt = System.currentTimeMillis()
             try {
                 socketFactory(addr.first, addr.second).use { sock ->
-                    Session(sock, store, config, password, emit).run()
+                    val session = Session(sock, store, config, password, emit, coverSink = coverSink)
+                    onSession(session)
+                    session.run()
                 }
                 delayMs = 5_000L // 正常斷線（eject 等）：快速重連
             } catch (e: Exception) {

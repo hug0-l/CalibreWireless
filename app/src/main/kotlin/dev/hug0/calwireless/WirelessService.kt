@@ -9,6 +9,9 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.IBinder
+import android.os.PowerManager
+import android.content.Context.WIFI_SERVICE
+import android.net.wifi.WifiManager
 import dev.hug0.calwireless.saf.SafInboxStore
 import java.net.Socket
 
@@ -17,6 +20,9 @@ class WirelessService : Service() {
     @Volatile private var stopped = false
     private var worker: Thread? = null
     @Volatile private var currentSocket: Socket? = null
+    @Volatile private var activeSession: Session? = null
+    private var wakeLock: PowerManager.WakeLock? = null
+    @Suppress("DEPRECATION") private var wifiLock: WifiManager.WifiLock? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -29,12 +35,17 @@ class WirelessService : Service() {
         startForeground(NOTIF_ID, buildNotification())
         stopped = false
         DeviceState.running.value = true
+        acquireLocks()
+        DeviceState.deleteFun = { lp -> activeSession?.takeIf { it.alive }?.deleteBook(lp) ?: false }
+        DeviceState.resyncFun = { try { currentSocket?.close() } catch (e: Exception) {} }
 
         val auto = intent?.getBooleanExtra(EXTRA_AUTO, true) ?: true
         val host = intent?.getStringExtra(EXTRA_HOST).orEmpty()
         val port = intent?.getIntExtra(EXTRA_PORT, 0) ?: 0
         val password = intent?.getStringExtra(EXTRA_PASSWORD).orEmpty().ifEmpty { null }
         val deviceName = intent?.getStringExtra(EXTRA_NAME).orEmpty().ifEmpty { "CalibreWireless" }
+        val formats = DeviceConfig.parseFormats(intent?.getStringExtra(EXTRA_FORMATS))
+        val packet = (intent?.getIntExtra(EXTRA_PACKET, 65536) ?: 65536).coerceIn(1024, 1 shl 20)
         val treeUriStr = intent?.getStringExtra(EXTRA_TREE)
         val tree = treeUriStr?.let { Uri.parse(it) }
 
@@ -48,6 +59,8 @@ class WirelessService : Service() {
         val config = DeviceConfig(
             deviceKind = android.os.Build.MODEL,
             deviceName = "$deviceName (${android.os.Build.MODEL})",
+            extensions = formats,
+            maxPacketLen = packet,
         )
         worker = Thread {
             val address: () -> Pair<String, Int>? = when {
@@ -67,9 +80,38 @@ class WirelessService : Service() {
                         s.tcpNoDelay = true
                     }
                 },
+                onSession = { activeSession = it },
+                coverSink = FileCoverSink(applicationContext),
             ).runLoop { stopped }
         }.also { it.isDaemon = true; it.start() }
         return START_STICKY
+    }
+
+    @Suppress("DEPRECATION")
+    private fun acquireLocks() {
+        if (wakeLock == null) {
+            wakeLock = (getSystemService(Context.POWER_SERVICE) as PowerManager)
+                .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "calwireless:conn")
+                .apply { setReferenceCounted(false); acquire() }
+        }
+        if (wifiLock == null) {
+            val mode = if (android.os.Build.VERSION.SDK_INT >= 29)
+                WifiManager.WIFI_MODE_FULL_LOW_LATENCY else WifiManager.WIFI_MODE_FULL
+            wifiLock = (applicationContext.getSystemService(WIFI_SERVICE) as WifiManager)
+                .createWifiLock(mode, "calwireless:wifi")
+                .apply { setReferenceCounted(false); acquire() }
+        }
+    }
+
+    private fun releaseLocks() {
+        try { wakeLock?.takeIf { it.isHeld }?.release() } catch (e: Exception) {}
+        wakeLock = null
+        try { wifiLock?.takeIf { it.isHeld }?.release() } catch (e: Exception) {}
+        wifiLock = null
+    }
+
+    private fun pushBooks() {
+        activeSession?.takeIf { it.alive }?.let { DeviceState.books.value = it.snapshot() }
     }
 
     private fun onEvent(e: WirelessEvent) {
@@ -80,10 +122,15 @@ class WirelessService : Service() {
                 DeviceState.library.value = e.libraryName
                 e.deviceUuid?.let { DeviceState.deviceUuid.value = it }
                 DeviceState.log(R.string.ev_connected, e.libraryName ?: "—", LogKind.OK)
+                pushBooks()
             }
-            is WirelessEvent.BookReceived -> DeviceState.log(R.string.ev_received, e.lpath, LogKind.OK)
+            is WirelessEvent.BookReceived -> {
+                DeviceState.log(R.string.ev_received, e.lpath, LogKind.OK)
+                transferHeadsUp(statusText(this, DeviceState.status.value) + " · " + getString(R.string.ev_received, e.lpath))
+                pushBooks()
+            }
             is WirelessEvent.BookServed -> DeviceState.log(R.string.ev_served, e.lpath, LogKind.OK)
-            is WirelessEvent.BookDeleted -> DeviceState.log(R.string.ev_deleted, e.lpath, LogKind.OK)
+            is WirelessEvent.BookDeleted -> { DeviceState.log(R.string.ev_deleted, e.lpath, LogKind.OK); pushBooks() }
             is WirelessEvent.PasswordRejected -> { DeviceState.status.value = Status.PASSWORD; DeviceState.log(R.string.ev_password, kind = LogKind.ERR) }
             is WirelessEvent.Busy -> { DeviceState.status.value = Status.BUSY; DeviceState.log(R.string.ev_busy, e.otherDevice, LogKind.WARN) }
             is WirelessEvent.Ejected -> { DeviceState.status.value = Status.EJECTED; DeviceState.log(R.string.ev_ejected, kind = LogKind.WARN) }
@@ -108,12 +155,30 @@ class WirelessService : Service() {
         .build()
 
     private fun createChannel() {
-        NotificationChannel(CHANNEL, getString(R.string.chan_name), NotificationManager.IMPORTANCE_LOW).let {
-            (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager).createNotificationChannel(it)
-        }
+        val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        nm.createNotificationChannel(
+            NotificationChannel(CHANNEL, getString(R.string.chan_name), NotificationManager.IMPORTANCE_LOW),
+        )
+        nm.createNotificationChannel(
+            NotificationChannel(TRANSFER_CHANNEL, getString(R.string.chan_transfer), NotificationManager.IMPORTANCE_HIGH),
+        )
+    }
+
+    private fun transferHeadsUp(text: String) {
+        val n = Notification.Builder(this, TRANSFER_CHANNEL)
+            .setContentTitle(getString(R.string.app_name))
+            .setContentText(text)
+            .setSmallIcon(android.R.drawable.ic_popup_sync)
+            .setAutoCancel(true)
+            .build()
+        (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager).notify(NOTIF_TRANSFER, n)
     }
 
     override fun onDestroy() {
+        releaseLocks()
+        DeviceState.deleteFun = null
+        DeviceState.resyncFun = null
+        DeviceState.books.value = emptyList()
         stopped = true
         try { currentSocket?.close() } catch (e: Exception) {}
         worker?.interrupt()
@@ -131,6 +196,10 @@ class WirelessService : Service() {
         const val EXTRA_NAME = "name"
         const val EXTRA_TREE = "tree"
         private const val CHANNEL = "calibre-wireless"
+        private const val TRANSFER_CHANNEL = "calibre-transfer"
         private const val NOTIF_ID = 1
+        private const val NOTIF_TRANSFER = 2
+        const val EXTRA_FORMATS = "formats"
+        const val EXTRA_PACKET = "packet"
     }
 }
