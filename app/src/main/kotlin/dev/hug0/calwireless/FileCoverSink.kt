@@ -14,6 +14,16 @@ class FileCoverSink(context: Context) : CoverSink {
         return File(dir, "$h.jpg")
     }
 
+    fun putRaw(lpath: String, bytes: ByteArray) {
+        try {
+            val f = fileFor(lpath)
+            val tmp = File(f.parentFile, f.name + ".tmp")
+            tmp.writeBytes(bytes)
+            tmp.renameTo(f)
+        } catch (e: Exception) {
+        }
+    }
+
     override fun put(lpath: String, base64Jpeg: String, width: Int, height: Int) {
         try {
             val bytes = Base64.decode(base64Jpeg, Base64.DEFAULT)

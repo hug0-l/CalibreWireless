@@ -100,6 +100,7 @@ import dev.hug0.calwireless.ui.inkFor
 import dev.hug0.calwireless.ui.ledFor
 import dev.hug0.calwireless.DeviceConfig
 import dev.hug0.calwireless.DeviceBookInfo
+import dev.hug0.calwireless.EpubCover
 import dev.hug0.calwireless.saf.SafInboxStore
 import android.content.ActivityNotFoundException
 import android.webkit.MimeTypeMap
@@ -430,13 +431,19 @@ private val KeyPort = intPreferencesKey("port")
 private val KeyPassword = stringPreferencesKey("password")
 private val KeyName = stringPreferencesKey("name")
 @Composable
-private fun Cover(lpath: String, modifier: Modifier = Modifier) {
+private fun Cover(lpath: String, treeUri: String, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     var bmp by remember(lpath) { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
     LaunchedEffect(lpath) {
         withContext(Dispatchers.IO) {
+            val sink = FileCoverSink(context)
             bmp = try {
-                android.graphics.BitmapFactory.decodeFile(FileCoverSink(context).fileFor(lpath).absolutePath)?.asImageBitmap()
+                val f = sink.fileFor(lpath)
+                if (!f.exists() && treeUri.isNotEmpty()) {
+                    val store = SafInboxStore(context, Uri.parse(treeUri))
+                    EpubCover.extract(store, lpath)?.let { sink.putRaw(lpath, it) }
+                }
+                android.graphics.BitmapFactory.decodeFile(f.absolutePath)?.asImageBitmap()
             } catch (e: Exception) {
                 null
             }
@@ -559,7 +566,7 @@ private fun DeviceTab(context: Context, s: Settings) {
                         .padding(horizontal = 12.dp, vertical = 10.dp),
                 ) {
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Cover(lpath = b.lpath, modifier = Modifier.size(width = 44.dp, height = 66.dp))
+                        Cover(lpath = b.lpath, treeUri = s.tree, modifier = Modifier.size(width = 44.dp, height = 66.dp))
                         Column(Modifier.weight(1f)) {
                     Text(b.title, style = sans(15, FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Spacer(Modifier.height(2.dp))
