@@ -103,7 +103,7 @@
 | 16' | SEND_BOOK_METADATA `{index, count, data}` | 不應答；更新書目 data.lpath；最後一本時 save |
 | 17 | DISPLAY_MESSAGE `{messageKind}` | kind1=密碼錯（斷線提示）；kind2=要求更新 app；kind3=toast；一律回 OK |
 | 18 | CALIBRE_BUSY `{otherDevice}` | 已有別台裝置連著；退避重試 |
-| 19 | SET_LIBRARY_INFO | 存 currentLibraryName 等給 UI，回 OK |
+| 19 | SET_LIBRARY_INFO | 存 libraryName（注意：SET_LIBRARY_INFO 用 libraryName/libraryUuid 駝峰鍵，GET_INITIALIZATION_INFO 才用 currentLibraryName），回 OK |
 | 20 | ERROR | （裝置→calibre 方向）|
 
 ### GET_INITIALIZATION_INFO 應答（裝置必帶欄位）

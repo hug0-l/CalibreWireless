@@ -81,7 +81,7 @@ class SessionHandshakeTest {
             assertTrue(total["total_space_on_device"]!!.jsonPrimitive.content.toLong() > 0)
             assertEquals(Op.OK, fc.call(Op.SET_CALIBRE_DEVICE_INFO,
                 """{"device_store_uuid":"abc","device_name":"CalibreWireless (Test)"}""").opcode)
-            assertEquals(Op.OK, fc.call(Op.SET_LIBRARY_INFO, """{"current_library_name":"我的庫"}""").opcode)
+            assertEquals(Op.OK, fc.call(Op.SET_LIBRARY_INFO, """{"libraryName":"我的庫"}""").opcode)
             fc.call(Op.NOOP, "{}") // sync point: OK 回來後事件已入列
             val ev = fc.events.filterIsInstance<WirelessEvent.Connected>().firstOrNull()
             assertEquals("我的庫", ev?.libraryName)

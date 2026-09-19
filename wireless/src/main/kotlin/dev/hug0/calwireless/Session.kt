@@ -92,7 +92,7 @@ class Session(
             Op.SET_CALIBRE_DEVICE_INFO -> { books.saveDriveInfo(json(f.json)); send(Op.OK) }
             Op.SET_CALIBRE_DEVICE_NAME -> send(Op.OK)
             Op.SET_LIBRARY_INFO -> {
-                emit(WirelessEvent.Connected(json(f.json)["current_library_name"]?.jsonPrimitive?.contentOrNull))
+                emit(WirelessEvent.Connected(json(f.json)["libraryName"]?.jsonPrimitive?.contentOrNull))
                 send(Op.OK)
             }
             Op.DISPLAY_MESSAGE -> {
@@ -100,6 +100,8 @@ class Session(
                 if (kind == 1) emit(WirelessEvent.PasswordRejected)
                 send(Op.OK)
             }
+            Op.GET_COLLECTIONS -> send(Op.OK, """{"collections":{}}""")
+            Op.UPDATE_COLLECTIONS -> send(Op.OK)
             Op.NOOP -> onNoop(f.json)
             Op.CALIBRE_BUSY -> {
                 emit(WirelessEvent.Busy(json(f.json)["otherDevice"]?.jsonPrimitive?.contentOrNull ?: ""))

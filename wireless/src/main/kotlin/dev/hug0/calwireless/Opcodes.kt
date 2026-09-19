@@ -20,5 +20,7 @@ object Op {
     const val DISPLAY_MESSAGE = 17
     const val CALIBRE_BUSY = 18
     const val SET_LIBRARY_INFO = 19
+    const val GET_COLLECTIONS = 21
+    const val UPDATE_COLLECTIONS = 22
     const val ERROR = 20
 }

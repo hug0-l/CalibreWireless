@@ -3,7 +3,7 @@ package dev.hug0.calwireless
 import java.io.File
 import kotlin.system.exitProcess
 
-fun main(args: List<String>) {
+fun main(args: Array<String>) {
     fun flag(name: String): String? {
         val i = args.indexOf(name)
         return if (i >= 0 && i + 1 < args.size) args[i + 1] else null
