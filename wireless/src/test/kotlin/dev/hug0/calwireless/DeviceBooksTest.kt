@@ -76,6 +76,27 @@ class DeviceBooksTest {
         assertEquals("none", db.uuidOf("a/A.epub"))
     }
 
+    @Test fun harvestsUnknownEbooks() {
+        val s = store()
+        s.write("known.epub")!!.use { it.write(ByteArray(3)) }
+        val db = DeviceBooks(s).apply { load() }
+        db.upsert(book("u1", "known.epub"), "known.epub")
+        db.save()
+        // 手動丟入的書 + 不相干檔
+        s.write("新書 x.epub")!!.use { it.write(ByteArray(7)) }
+        s.write("notes.txt")!!.use { it.write(ByteArray(1)) }
+        val added = db.harvest(setOf("epub"))
+        assertEquals(1, added)
+        assertEquals(2, db.count())
+        val lpath = db.books.last()["lpath"]!!.jsonPrimitive.content
+        assertEquals("新書 x.epub", lpath)
+        assertEquals("新書 x", db.books.last()["title"]?.jsonPrimitive?.content)
+        // 冪等 + harvest 後 prune/load 穩定
+        assertEquals(0, db.harvest(setOf("epub")))
+        val db2 = DeviceBooks(s).apply { load() }
+        assertEquals(2, db2.count())
+    }
+
     @Test fun deviceUuidStableAcrossReloads() {
         val s = store()
         val db = DeviceBooks(s)

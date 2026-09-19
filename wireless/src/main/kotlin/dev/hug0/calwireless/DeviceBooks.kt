@@ -81,6 +81,26 @@ class DeviceBooks(private val store: InboxStore) {
         books.removeAll { it.str("lpath")?.let { p -> p !in existing } ?: true }
     }
 
+    /** 使用者手動丟進收件夾的書：自動入表（最小 metadata，calibre 入庫後可再編輯）。回傳新增數 */
+    fun harvest(extensions: Set<String>): Int {
+        val known = books.mapNotNull { it.str("lpath") }.toHashSet()
+        var added = 0
+        for (rel in store.list()) {
+            if (rel in known) continue
+            val ext = rel.substringAfterLast('.', "").lowercase()
+            if (ext == "calibre" || ext !in extensions) continue
+            val name = rel.substringAfterLast('/').substringBeforeLast('.')
+            books.add(
+                Json.parseToJsonElement(
+                    """{"uuid":"${java.util.UUID.randomUUID()}","lpath":${JsonPrimitive(rel)},"title":${JsonPrimitive(name)},"last_modified":"None","size":${store.size(rel) ?: 0},"authors":["Unknown"],"tags":[]}"""
+                ).jsonObject
+            )
+            added++
+        }
+        if (added > 0) save()
+        return added
+    }
+
     fun deviceUuid(): String {
         val raw = store.readText(DRIVE_FILE)
         if (raw != null) {

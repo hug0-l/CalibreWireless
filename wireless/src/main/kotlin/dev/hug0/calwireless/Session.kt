@@ -141,6 +141,7 @@ class Session(
     }
 
     private fun onBookCount() {
+        books.harvest(config.extensionSet)
         send(Op.OK, """{"count":${books.count()},"willStream":true,"willScan":true}""")
         for (i in 1..books.count()) send(Op.OK, books.idFrame(i))
     }
