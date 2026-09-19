@@ -13,3 +13,4 @@ dependencyResolutionManagement {
 }
 rootProject.name = "CalibreWireless"
 include("wireless")
+include("app")
