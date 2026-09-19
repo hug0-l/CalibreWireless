@@ -183,3 +183,22 @@ passwordHash: sha1_hex(password + passwordChallenge)（無密碼則 ""）
 3. **M2 活體驗證**：JVM CLI 連 Mac 真 calibre 走完 §7 第二層清單
 4. **M3 Android 外殼**：SafInboxStore+ForegroundService+UI+通知
 5. **M4 實機 E2E**：§7 第三層 1–7 全過，交付日常用
+
+## 10. 後續路線圖（v2+ 候選，2026-09-19 收工時記錄）
+
+功能候選（依價值排序）：
+1. 閱讀狀態回傳：init 宣告 `isReadSyncCol`/`_is_read_`（協議原生），手機標「讀完」→ calibre 自訂欄同步
+2. harvest 升級：對新檔直接解析 EPUB OPF / PDF 首頁取真實 title/authors（現在是檔名+Unknown）
+3. 封面縮圖：calibre 在 metadata 帶 `thumbnail`（我們已收到但 slim 掉）→ 存檔供裝置視圖
+4. 傳輸完成後的通知（現在只有面板 log）；以及「收件夾新書待入庫 N 本」計數
+5. 開機/連上 Wi-Fi 自動拉起 Service（現在手動開）；以及多伺服器 profile（公司 Mac / 家中 Mac）
+6. 純 Content Server 旁路（方案 A 遺留價值）：calibre 8+ 的 /cdb/add-book 可讓「手機主動拉庫/上傳」成真，與本协议可共存（一個管 calibre-GUI 驅動、一個管手機驅動）
+7. mDNS/Bonjour 探索（calibre 有 publish_zeroconf）作為 UDP 廣播不通時（跨 VLAN）的後備
+
+測試候選（下一批边界）：
+- 併發：calibre 推書中途「從裝置新增」排隊順序（鎖步下應天然串行——驗證）
+- 大檔（>2GB 單檔，Int 溢出：length 是 long ✓ 已測 81MB）
+- lpath 含 `#`、`%`、換行符等 SAF documentId 編碼地雷字元
+- 收件夾被外部（檔案管理 app）清空 → prune + 重連後 calibre 視圖收斂
+- Service 被系統回收（開發者選項「不保留活動」+ 低記憶體模擬）後 startForeground 重建
+- 兩個 calibre 實例同網段的探索競選（hello 回包先到先用）
