@@ -17,60 +17,61 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import dev.hug0.calwireless.Led
 import dev.hug0.calwireless.LogKind
+import dev.hug0.calwireless.Status
 
 val Mono = FontFamily.Monospace
 
-val Canvas = Color(0xFF0E1113)
-val Panel = Color(0xFF16191C)
-val LogBg = Color(0xFF0B0D0F)
-val Ink = Color(0xFFE6EDF3)
-val InkDim = Color(0xFF8B949E)
-val InkFaint = Color(0xFF6E7681)
-val BorderDim = Color(0x14FFFFFF)
+// 暖石墨：一台安靜的器材，不是電競終端機
+val Canvas = Color(0xFF161518)
+val Panel = Color(0xFF1F1E22)
+val Panel2 = Color(0xFF26252B)
+val LogBg = Color(0xFF101013)
+val Ink = Color(0xFFECE9E4)
+val InkDim = Color(0xFFA6A098)
+val InkFaint = Color(0xFF756F68)
+val BorderDim = Color(0x12ECE9E4)
+
+private val Sage = Color(0xFF8CBF94)
+private val Amber = Color(0xFFD9A441)
+private val Rust = Color(0xFFD07064)
+private val Slate = Color(0xFF5C5A5E)
 
 fun inkFor(kind: LogKind): Color = when (kind) {
-    LogKind.OK -> Color(0xFF3FB950)
-    LogKind.WARN -> Color(0xFFD29922)
-    LogKind.ERR -> Color(0xFFF85149)
+    LogKind.OK -> Sage
+    LogKind.WARN -> Amber
+    LogKind.ERR -> Rust
     LogKind.INFO -> InkDim
+}
+
+fun ledFor(status: Status): Pair<Color, Boolean> = when (status) {
+    Status.IDLE -> Slate to false
+    Status.CONNECTING, Status.RETRY, Status.EJECTED -> Amber to true
+    Status.CONNECTED -> Sage to false
+    Status.PASSWORD -> Rust to false
+    Status.BUSY -> Amber to false
 }
 
 @Composable
 fun DevicePanelTheme(content: @Composable () -> Unit) {
     MaterialTheme(
         colorScheme = darkColorScheme(
-            primary = Color(0xFF3FB950),
+            primary = Sage,
             background = Canvas,
             surface = Panel,
-            surfaceVariant = Color(0xFF1C2024),
+            surfaceVariant = Panel2,
             onBackground = Ink,
             onSurface = Ink,
             onSurfaceVariant = InkDim,
             outline = BorderDim,
-            error = Color(0xFFF85149),
-        ),
-        typography = MaterialTheme.typography.copy(
-            titleLarge = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
+            error = Rust,
         ),
     ) { content() }
 }
 
-fun ledColor(led: Led): Color = when (led) {
-    Led.OFF -> Color(0xFF545D68)
-    Led.PULSE -> Color(0xFFD29922)
-    Led.GREEN -> Color(0xFF3FB950)
-    Led.AMBER -> Color(0xFFD29922)
-    Led.RED -> Color(0xFFF85149)
-}
-
 @Composable
-fun StatusLed(led: Led, reducedMotion: Boolean = false, modifier: Modifier = Modifier) {
-    val color = ledColor(led)
-    val pulse = led == Led.PULSE && !reducedMotion
+fun StatusLed(color: Color, pulse: Boolean, modifier: Modifier = Modifier) {
     val transition = rememberInfiniteTransition(label = "led")
     val anim by transition.animateFloat(
         initialValue = 0.35f,
@@ -81,7 +82,7 @@ fun StatusLed(led: Led, reducedMotion: Boolean = false, modifier: Modifier = Mod
     val lit = if (pulse) anim else 1f
     Box(
         modifier.size(20.dp).clip(CircleShape)
-            .background(color.copy(alpha = if (pulse) 0.16f * lit else 0.14f)),
+            .background(color.copy(alpha = if (pulse) 0.16f * lit else 0.13f)),
         contentAlignment = androidx.compose.ui.Alignment.Center,
     ) {
         Box(

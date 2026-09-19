@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">CalibreWireless</string>
+    <string name="header">CALIBRE · 無線裝置</string>
+
+    <string name="st_idle">待機</string>
+    <string name="st_connecting">連接中…</string>
+    <string name="st_connected">已連接</string>
+    <string name="st_retry">斷線，重試中</string>
+    <string name="st_password">密碼錯誤</string>
+    <string name="st_busy">calibre 忙碌</string>
+    <string name="st_ejected">已退出，待重連</string>
+
+    <string name="meta_line">書庫 %1$s · 序號 %2$s</string>
+    <string name="lbl_inbox">收件夾</string>
+    <string name="lbl_conn">連線</string>
+    <string name="conn_auto">自動探索</string>
+    <string name="unconfigured">未設定</string>
+        <string name="log_title">事件</string>
+    <string name="log_empty">— 尚無事件 —</string>
+
+    <string name="ev_connected">已連接書庫 %1$s</string>
+    <string name="ev_received">收到書 %1$s</string>
+    <string name="ev_served">已提供書 %1$s</string>
+    <string name="ev_deleted">已刪除 %1$s</string>
+    <string name="ev_password">密碼被拒絕</string>
+    <string name="ev_busy">calibre 正連接其他裝置：%1$s</string>
+    <string name="ev_ejected">calibre 退出裝置</string>
+    <string name="ev_disconnected">斷線：%1$s</string>
+
+    <string name="log_no_folder">尚未選取收件夾，無法啟動</string>
+    <string name="log_saf_fail">SAF 授權失敗：%1$s</string>
+    <string name="log_folder_set">收件夾已設定：%1$s</string>
+    <string name="log_need_setup">請先設定收件夾與連線</string>
+
+    <string name="set_auto">自動探索區域網路的 calibre</string>
+    <string name="set_host">IP / 主機</string>
+    <string name="set_port">TCP 埠（calibre 固定連接埠）</string>
+    <string name="set_password">密碼（若 calibre 有設）</string>
+    <string name="set_name">裝置顯示名</string>
+    <string name="set_save">儲存</string>
+    <string name="set_cancel">取消</string>
+
+    <string name="chan_name">calibre 無線裝置</string>
+</resources>

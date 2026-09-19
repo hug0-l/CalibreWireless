@@ -26,21 +26,21 @@ class WirelessService : Service() {
             return START_NOT_STICKY
         }
         createChannel()
-        startForeground(NOTIF_ID, buildNotification("連接中"))
+        startForeground(NOTIF_ID, buildNotification())
         stopped = false
         DeviceState.running.value = true
 
         val auto = intent?.getBooleanExtra(EXTRA_AUTO, true) ?: true
         val host = intent?.getStringExtra(EXTRA_HOST).orEmpty()
-        val port = (intent?.getIntExtra(EXTRA_PORT, 0) ?: 0)
+        val port = intent?.getIntExtra(EXTRA_PORT, 0) ?: 0
         val password = intent?.getStringExtra(EXTRA_PASSWORD).orEmpty().ifEmpty { null }
         val deviceName = intent?.getStringExtra(EXTRA_NAME).orEmpty().ifEmpty { "CalibreWireless" }
         val treeUriStr = intent?.getStringExtra(EXTRA_TREE)
         val tree = treeUriStr?.let { Uri.parse(it) }
 
         if (tree == null) {
-            DeviceState.status.value = "未選收件夾"
-            DeviceState.log("未選收件夾，無法啟動")
+            DeviceState.status.value = Status.IDLE
+            DeviceState.log(R.string.log_no_folder, kind = LogKind.ERR)
             stopSelf()
             return START_NOT_STICKY
         }
@@ -51,12 +51,10 @@ class WirelessService : Service() {
         )
         worker = Thread {
             val address: () -> Pair<String, Int>? = when {
-                auto -> {
-                    { Discover.hello()?.let { it.address to it.tcpPort } }
-                }
+                auto -> { { Discover.hello()?.let { it.address to it.tcpPort } } }
                 else -> { { host to port } }
             }
-            val device = WirelessDevice(
+            WirelessDevice(
                 store = SafInboxStore(applicationContext, tree),
                 config = config,
                 password = password,
@@ -69,37 +67,36 @@ class WirelessService : Service() {
                         s.tcpNoDelay = true
                     }
                 },
-            )
-            device.runLoop { stopped }
+            ).runLoop { stopped }
         }.also { it.isDaemon = true; it.start() }
         return START_STICKY
     }
 
     private fun onEvent(e: WirelessEvent) {
         when (e) {
-            is WirelessEvent.Connecting -> { DeviceState.setStatus("連接中…", Led.PULSE); DeviceState.log("連接中…") }
+            is WirelessEvent.Connecting -> { DeviceState.status.value = Status.CONNECTING; DeviceState.log(R.string.st_connecting) }
             is WirelessEvent.Connected -> {
+                DeviceState.status.value = Status.CONNECTED
                 DeviceState.library.value = e.libraryName
                 e.deviceUuid?.let { DeviceState.deviceUuid.value = it }
-                DeviceState.setStatus("已連接", Led.GREEN)
-                DeviceState.log("已連接書庫 ${e.libraryName ?: ""}", LogKind.OK)
+                DeviceState.log(R.string.ev_connected, e.libraryName ?: "—", LogKind.OK)
             }
-            is WirelessEvent.BookReceived -> DeviceState.log("收到書 ${e.lpath} (${e.size / 1024}KB)", LogKind.OK)
-            is WirelessEvent.BookServed -> DeviceState.log("已提供 ${e.lpath}", LogKind.OK)
-            is WirelessEvent.BookDeleted -> DeviceState.log("已刪除 ${e.lpath}", LogKind.OK)
-            is WirelessEvent.PasswordRejected -> { DeviceState.setStatus("密碼錯誤", Led.RED); DeviceState.log("密碼被拒絕", LogKind.ERR) }
-            is WirelessEvent.Busy -> { DeviceState.setStatus("calibre 忙碌", Led.AMBER); DeviceState.log("calibre 正連接 ${e.otherDevice}", LogKind.WARN) }
-            is WirelessEvent.Ejected -> { DeviceState.setStatus("已退出，待重連", Led.PULSE); DeviceState.log("calibre 退出裝置", LogKind.WARN) }
-            is WirelessEvent.Disconnected -> { DeviceState.setStatus("斷線，重試中", Led.PULSE); DeviceState.log("斷線: ${e.cause}", LogKind.WARN) }
-            is WirelessEvent.Log -> DeviceState.log(e.message)
+            is WirelessEvent.BookReceived -> DeviceState.log(R.string.ev_received, e.lpath, LogKind.OK)
+            is WirelessEvent.BookServed -> DeviceState.log(R.string.ev_served, e.lpath, LogKind.OK)
+            is WirelessEvent.BookDeleted -> DeviceState.log(R.string.ev_deleted, e.lpath, LogKind.OK)
+            is WirelessEvent.PasswordRejected -> { DeviceState.status.value = Status.PASSWORD; DeviceState.log(R.string.ev_password, kind = LogKind.ERR) }
+            is WirelessEvent.Busy -> { DeviceState.status.value = Status.BUSY; DeviceState.log(R.string.ev_busy, e.otherDevice, LogKind.WARN) }
+            is WirelessEvent.Ejected -> { DeviceState.status.value = Status.EJECTED; DeviceState.log(R.string.ev_ejected, kind = LogKind.WARN) }
+            is WirelessEvent.Disconnected -> { DeviceState.status.value = Status.RETRY; DeviceState.log(R.string.ev_disconnected, e.cause, LogKind.WARN) }
+            is WirelessEvent.Log -> DeviceState.logRaw(e.message)
         }
         (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager)
-            .notify(NOTIF_ID, buildNotification(DeviceState.status.value))
+            .notify(NOTIF_ID, buildNotification())
     }
 
-    private fun buildNotification(status: String): Notification = Notification.Builder(this, CHANNEL)
-        .setContentTitle("CalibreWireless")
-        .setContentText(status)
+    private fun buildNotification(): Notification = Notification.Builder(this, CHANNEL)
+        .setContentTitle(getString(R.string.app_name))
+        .setContentText(statusText(this, DeviceState.status.value))
         .setSmallIcon(android.R.drawable.ic_popup_sync)
         .setContentIntent(
             PendingIntent.getActivity(
@@ -111,7 +108,7 @@ class WirelessService : Service() {
         .build()
 
     private fun createChannel() {
-        NotificationChannel(CHANNEL, "calibre 無線裝置", NotificationManager.IMPORTANCE_LOW).let {
+        NotificationChannel(CHANNEL, getString(R.string.chan_name), NotificationManager.IMPORTANCE_LOW).let {
             (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager).createNotificationChannel(it)
         }
     }
@@ -121,7 +118,7 @@ class WirelessService : Service() {
         try { currentSocket?.close() } catch (e: Exception) {}
         worker?.interrupt()
         DeviceState.running.value = false
-        DeviceState.status.value = "待機"
+        DeviceState.status.value = Status.IDLE
         super.onDestroy()
     }
 

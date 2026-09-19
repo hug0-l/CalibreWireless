@@ -11,9 +11,13 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,6 +26,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -30,9 +35,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.selection.toggleable
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
@@ -53,34 +56,36 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.selection.toggleable
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import dev.hug0.calwireless.ui.BorderDim
+import dev.hug0.calwireless.ui.Canvas
 import dev.hug0.calwireless.ui.DevicePanelTheme
 import dev.hug0.calwireless.ui.Ink
 import dev.hug0.calwireless.ui.InkDim
 import dev.hug0.calwireless.ui.InkFaint
 import dev.hug0.calwireless.ui.LogBg
-import dev.hug0.calwireless.ui.BorderDim
 import dev.hug0.calwireless.ui.Mono
 import dev.hug0.calwireless.ui.Panel
+import dev.hug0.calwireless.ui.Panel2
 import dev.hug0.calwireless.ui.StatusLed
 import dev.hug0.calwireless.ui.inkFor
+import dev.hug0.calwireless.ui.ledFor
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
-import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.layout.offset
 
 private val Context.dataStore by preferencesDataStore(name = "settings")
 
@@ -93,19 +98,24 @@ private data class Settings(
     val tree: String = "",
 ) {
     fun ready() = tree.isNotEmpty() && (auto || host.isNotEmpty())
+    fun folderName(): String =
+        if (tree.isEmpty()) "" else Uri.parse(tree).lastPathSegment?.substringAfter(':').orEmpty()
 }
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        window.statusBarColor = AndroidColor.parseColor("#0E1113")
-        window.navigationBarColor = AndroidColor.parseColor("#0E1113")
+        window.statusBarColor = AndroidColor.parseColor("#161518")
+        window.navigationBarColor = AndroidColor.parseColor("#161518")
         setContent { DevicePanelTheme { MainScreen(this) } }
     }
 }
 
-private fun mono(sizeSp: Int, weight: FontWeight = FontWeight.Normal, color: Color = Ink, tracking: Int = 0): TextStyle =
-    TextStyle(fontFamily = Mono, fontSize = sizeSp.sp, fontWeight = weight, color = color, letterSpacing = tracking.sp)
+private fun sans(size: Int, weight: FontWeight = FontWeight.Normal, color: Color = Ink, tracking: Float = 0f) =
+    TextStyle(fontSize = size.sp, fontWeight = weight, color = color, letterSpacing = tracking.sp)
+
+private fun mono(size: Int, weight: FontWeight = FontWeight.Normal, color: Color = Ink) =
+    TextStyle(fontFamily = Mono, fontSize = size.sp, fontWeight = weight, color = color)
 
 @Composable
 private fun Chip(label: String, value: String, onClick: () -> Unit) {
@@ -116,9 +126,9 @@ private fun Chip(label: String, value: String, onClick: () -> Unit) {
             .clickable(onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 10.dp),
     ) {
-        Text(label.uppercase(), style = mono(9, color = InkFaint, tracking = 2))
+        Text(label, style = sans(10, FontWeight.Medium, InkFaint, 1.2f))
         Spacer(Modifier.height(3.dp))
-        Text(value, style = mono(12, FontWeight.Medium, Ink), maxLines = 1)
+        Text(value, style = sans(13, FontWeight.Medium), maxLines = 1)
     }
 }
 
@@ -134,7 +144,7 @@ private fun DeviceSwitch(checked: Boolean, onChange: (Boolean) -> Unit) {
     Box(
         Modifier.width((if (pressed) 54 else 56).dp).height(32.dp)
             .clip(RoundedCornerShape(16.dp))
-            .background(if (checked) Color(0xFF2EA043) else Color(0xFF2A2E33))
+            .background(if (checked) Color(0xFF5F8266) else Color(0xFF2A292F))
             .border(1.dp, BorderDim, RoundedCornerShape(16.dp))
             .toggleable(
                 value = checked,
@@ -148,7 +158,7 @@ private fun DeviceSwitch(checked: Boolean, onChange: (Boolean) -> Unit) {
     ) {
         Box(
             Modifier.offset(x = thumbOffset).size(26.dp).clip(CircleShape)
-                .background(if (checked) Color(0xFF0D1117) else InkDim),
+                .background(if (checked) Canvas else InkDim),
         )
     }
 }
@@ -173,7 +183,6 @@ private fun MainScreen(context: Context) {
     }
 
     val status by DeviceState.status.collectAsState()
-    val led by DeviceState.led.collectAsState()
     val running by DeviceState.running.collectAsState()
     val library by DeviceState.library.collectAsState()
     val uuid by DeviceState.deviceUuid.collectAsState()
@@ -208,19 +217,21 @@ private fun MainScreen(context: Context) {
                     uri, Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
                 )
             } catch (e: Exception) {
-                DeviceState.log("SAF 授權失敗: ${e.message}", LogKind.ERR)
+                DeviceState.log(R.string.log_saf_fail, e.message, LogKind.ERR)
             }
             val ns = s.copy(tree = uri.toString())
             savePrefs(ns)
-            DeviceState.log("收件夾：${Uri.parse(ns.tree).lastPathSegment ?: ns.tree}", LogKind.OK)
+            DeviceState.log(R.string.log_folder_set, ns.folderName(), LogKind.OK)
         }
     }
+
+    val (ledColor, ledPulse) = ledFor(status)
 
     Column(
         Modifier.fillMaxSize().padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Text("CALIBRE · WIRELESS DEVICE", style = mono(10, color = InkFaint, tracking = 4))
+        Text(stringResource(R.string.header), style = sans(10, FontWeight.Medium, InkFaint, 3f))
 
         Column(
             Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp))
@@ -228,13 +239,13 @@ private fun MainScreen(context: Context) {
                 .padding(16.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                StatusLed(led)
+                StatusLed(ledColor, ledPulse)
                 Spacer(Modifier.width(8.dp))
                 Column(Modifier.weight(1f)) {
-                    Text(status, style = mono(20, FontWeight.SemiBold))
+                    Text(statusText(context, status), style = sans(22, FontWeight.SemiBold))
                     Spacer(Modifier.height(3.dp))
                     Text(
-                        "書庫 ${library ?: "—"} · 序號 ${uuid?.take(8) ?: "—"}",
+                        stringResource(R.string.meta_line, library ?: "—", uuid?.take(8) ?: "—"),
                         style = mono(11, color = InkFaint),
                     )
                 }
@@ -242,7 +253,7 @@ private fun MainScreen(context: Context) {
                     if (!loaded) return@DeviceSwitch
                     if (on) {
                         if (!s.ready()) {
-                            DeviceState.log("請先設定收件夾" + if (s.auto) "" else "與伺服器位址", LogKind.WARN)
+                            DeviceState.log(R.string.log_need_setup, kind = LogKind.WARN)
                         } else if (Build.VERSION.SDK_INT >= 33) {
                             notifLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                         } else {
@@ -256,30 +267,52 @@ private fun MainScreen(context: Context) {
             Spacer(Modifier.height(14.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Box(Modifier.weight(1f)) {
-                    Chip("收件夾", Uri.parse(s.tree.ifEmpty { " " }).lastPathSegment ?: "未設定") { treeLauncher.launch(null) }
+                    Chip(
+                        stringResource(R.string.lbl_inbox),
+                        s.folderName().ifEmpty { stringResource(R.string.unconfigured) },
+                    ) { treeLauncher.launch(null) }
                 }
                 Box(Modifier.weight(1f)) {
-                    Chip("連線", if (s.auto) "自動探索" else "${s.host}:${s.port}") { showSheet = true }
+                    Chip(
+                        stringResource(R.string.lbl_conn),
+                        if (s.auto) stringResource(R.string.conn_auto) else "${s.host}:${s.port}",
+                    ) { showSheet = true }
                 }
             }
         }
 
-        Text("事件", style = mono(10, FontWeight.Medium, InkFaint, tracking = 3))
         Column(
             Modifier.fillMaxWidth().weight(1f).clip(RoundedCornerShape(12.dp))
                 .background(LogBg).border(1.dp, BorderDim, RoundedCornerShape(12.dp))
                 .padding(horizontal = 12.dp, vertical = 10.dp),
         ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(stringResource(R.string.log_title), style = sans(10, FontWeight.Medium, InkFaint, 2f), modifier = Modifier.weight(1f))
+                Text("%03d".format(logs.size), style = mono(10, color = InkFaint))
+            }
+            Spacer(Modifier.height(8.dp))
             val listState = rememberLazyListState()
             LaunchedEffect(logs.size) { if (logs.isNotEmpty()) listState.animateScrollToItem(logs.size - 1) }
             if (logs.isEmpty()) {
-                Text("— 暫無事件 —", style = mono(11, color = InkFaint), modifier = Modifier.fillMaxWidth().padding(top = 24.dp), textAlign = TextAlign.Center)
+                Text(
+                    stringResource(R.string.log_empty),
+                    style = mono(11, color = InkFaint),
+                    modifier = Modifier.fillMaxWidth().padding(top = 24.dp),
+                    textAlign = TextAlign.Center,
+                )
             }
             LazyColumn(Modifier.fillMaxSize(), state = listState, verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 items(logs) { line ->
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(line.time, style = mono(10, color = InkFaint))
-                        Text(line.text, style = mono(11, color = inkFor(line.kind)), modifier = Modifier.weight(1f))
+                        val color = inkFor(line.kind)
+                        Text(
+                            text = if (line.res == 0) line.raw.orEmpty()
+                            else if (line.arg != null) stringResource(line.res, line.arg)
+                            else stringResource(line.res),
+                            style = mono(11, color = color),
+                            modifier = Modifier.weight(1f),
+                        )
                     }
                 }
             }
@@ -291,33 +324,38 @@ private fun MainScreen(context: Context) {
         ModalBottomSheet(
             onDismissRequest = { showSheet = false },
             sheetState = rememberModalBottomSheetState(),
-            containerColor = Color(0xFF1C2024),
+            containerColor = Panel2,
         ) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Switch(checked = t.auto, onCheckedChange = { t = t.copy(auto = it) })
-                    Text("自動探索區域網路的 calibre", style = mono(12, color = InkDim))
+                    Text(stringResource(R.string.set_auto), style = sans(13, color = InkDim))
                 }
                 if (!t.auto) {
-                    OutlinedTextField(t.host, { t = t.copy(host = it) }, label = { Text("IP / 主機") }, singleLine = true)
+                    OutlinedTextField(t.host, { t = t.copy(host = it) }, label = { Text(stringResource(R.string.set_host)) }, singleLine = true)
                     OutlinedTextField(
                         t.port.toString(),
                         { t = t.copy(port = it.filter(Char::isDigit).toIntOrNull() ?: 0) },
-                        label = { Text("TCP 埠（calibre 固定連接埠）") },
+                        label = { Text(stringResource(R.string.set_port)) },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     )
                 }
-                OutlinedTextField(t.password, { t = t.copy(password = it) }, label = { Text("密碼（若 calibre 有設）") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password))
-                OutlinedTextField(t.name, { t = t.copy(name = it) }, label = { Text("裝置顯示名") }, singleLine = true)
+                OutlinedTextField(
+                    t.password, { t = t.copy(password = it) },
+                    label = { Text(stringResource(R.string.set_password)) },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                )
+                OutlinedTextField(t.name, { t = t.copy(name = it) }, label = { Text(stringResource(R.string.set_name)) }, singleLine = true)
                 Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
-                    TextButton(onClick = { showSheet = false }) { Text("取消") }
+                    TextButton(onClick = { showSheet = false }) { Text(stringResource(R.string.set_cancel)) }
                     Button(onClick = {
                         savePrefs(t)
                         s = t
                         showSheet = false
                         if (DeviceState.running.value) startService(t)
-                    }) { Text("儲存") }
+                    }) { Text(stringResource(R.string.set_save)) }
                 }
                 Spacer(Modifier.height(20.dp))
             }

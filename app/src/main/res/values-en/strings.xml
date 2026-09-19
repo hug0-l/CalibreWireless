@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">CalibreWireless</string>
+    <string name="header">CALIBRE · WIRELESS DEVICE</string>
+
+    <string name="st_idle">Idle</string>
+    <string name="st_connecting">Connecting…</string>
+    <string name="st_connected">Connected</string>
+    <string name="st_retry">Offline — retrying</string>
+    <string name="st_password">Wrong password</string>
+    <string name="st_busy">calibre busy</string>
+    <string name="st_ejected">Ejected — waiting</string>
+
+    <string name="meta_line">library %1$s · serial %2$s</string>
+    <string name="lbl_inbox">Inbox</string>
+    <string name="lbl_conn">Connection</string>
+    <string name="conn_auto">Auto-discover</string>
+    <string name="unconfigured">Not set</string>
+        <string name="log_title">EVENT LOG</string>
+    <string name="log_empty">— no events —</string>
+
+    <string name="ev_connected">Connected to library %1$s</string>
+    <string name="ev_received">Received %1$s</string>
+    <string name="ev_served">Served %1$s</string>
+    <string name="ev_deleted">Deleted %1$s</string>
+    <string name="ev_password">Password rejected</string>
+    <string name="ev_busy">calibre is busy with %1$s</string>
+    <string name="ev_ejected">calibre ejected this device</string>
+    <string name="ev_disconnected">Disconnected: %1$s</string>
+
+    <string name="log_no_folder">No inbox folder — cannot start</string>
+    <string name="log_saf_fail">SAF permission failed: %1$s</string>
+    <string name="log_folder_set">Inbox set: %1$s</string>
+    <string name="log_need_setup">Pick an inbox folder and configure the connection first</string>
+
+    <string name="set_auto">Auto-discover calibre on the LAN</string>
+    <string name="set_host">Host / IP</string>
+    <string name="set_port">TCP port (calibre fixed port)</string>
+    <string name="set_password">Password (if set in calibre)</string>
+    <string name="set_name">Device name</string>
+    <string name="set_save">Save</string>
+    <string name="set_cancel">Cancel</string>
+
+    <string name="chan_name">calibre wireless device</string>
+</resources>
