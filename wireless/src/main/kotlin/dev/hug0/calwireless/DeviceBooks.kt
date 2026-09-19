@@ -5,10 +5,14 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonArray
+import kotlinx.serialization.json.add
 import java.util.UUID
 
 class DeviceBooks(private val store: InboxStore) {
@@ -81,7 +85,7 @@ class DeviceBooks(private val store: InboxStore) {
         books.removeAll { it.str("lpath")?.let { p -> p !in existing } ?: true }
     }
 
-    /** 使用者手動丟進收件夾的書：自動入表（最小 metadata，calibre 入庫後可再編輯）。回傳新增數 */
+    /** 使用者手動丟進收件夾的書：自動入表。EPUB 解析 OPF 取真 metadata，其餘退回檔名。回傳新增數 */
     fun harvest(extensions: Set<String>): Int {
         val known = books.mapNotNull { it.str("lpath") }.toHashSet()
         var added = 0
@@ -89,12 +93,24 @@ class DeviceBooks(private val store: InboxStore) {
             if (rel in known) continue
             val ext = rel.substringAfterLast('.', "").lowercase()
             if (ext == "calibre" || ext !in extensions) continue
-            val name = rel.substringAfterLast('/').substringBeforeLast('.')
-            books.add(
-                Json.parseToJsonElement(
-                    """{"uuid":"${java.util.UUID.randomUUID()}","lpath":${JsonPrimitive(rel)},"title":${JsonPrimitive(name)},"last_modified":"None","size":${store.size(rel) ?: 0},"authors":["Unknown"],"tags":[]}"""
-                ).jsonObject
-            )
+            val fallbackTitle = rel.substringAfterLast('/').substringBeforeLast('.')
+            val meta = if (ext == "epub") EpubMeta.read(store, rel) else null
+            val title = meta?.title?.takeIf { it.isNotBlank() } ?: fallbackTitle
+            val authors = meta?.authors?.takeIf { it.isNotEmpty() } ?: listOf("Unknown")
+            val o = buildJsonObject {
+                put("uuid", UUID.randomUUID().toString())
+                put("lpath", rel)
+                put("title", title)
+                put("last_modified", "None")
+                put("size", store.size(rel) ?: 0L)
+                putJsonArray("authors") { authors.forEach { add(it) } }
+                putJsonArray("tags") {}
+                meta?.series?.let {
+                    put("series", it)
+                    meta.seriesIndex?.let { idx -> put("series_index", idx) }
+                }
+            }
+            books.add(o)
             added++
         }
         if (added > 0) save()
