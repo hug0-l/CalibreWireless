@@ -80,11 +80,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.selection.toggleable
-import androidx.datastore.preferences.core.booleanPreferencesKey
-import androidx.datastore.preferences.core.edit
-import androidx.datastore.preferences.core.intPreferencesKey
-import androidx.datastore.preferences.core.stringPreferencesKey
-import androidx.datastore.preferences.preferencesDataStore
 import dev.hug0.calwireless.ui.BorderDim
 import dev.hug0.calwireless.ui.Canvas
 import dev.hug0.calwireless.ui.DevicePanelTheme
@@ -108,24 +103,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
-
-private val Context.dataStore by preferencesDataStore(name = "settings")
-
-private data class Settings(
-    val auto: Boolean = true,
-    val host: String = "",
-    val port: Int = 8135,
-    val password: String = "",
-    val name: String = "CalibreWireless",
-    val tree: String = "",
-    val formats: String = DeviceConfig.DEFAULT_FORMATS.joinToString(","),
-    val packet: Int = 65536,
-    val anim: Boolean = true,
-) {
-    fun ready() = tree.isNotEmpty() && (auto || host.isNotEmpty())
-    fun folderName(): String =
-        if (tree.isEmpty()) "" else Uri.parse(tree).lastPathSegment?.substringAfter(':').orEmpty()
-}
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -195,19 +172,7 @@ private fun MainScreen(context: Context) {
     var s by remember { mutableStateOf(Settings()) }
     var loaded by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
-        context.dataStore.data.map { p ->
-            Settings(
-                auto = p[KeyAuto] ?: true,
-                host = p[KeyHost] ?: "",
-                port = p[KeyPort] ?: 8135,
-                password = p[KeyPassword] ?: "",
-                name = p[KeyName] ?: "CalibreWireless",
-                tree = p[KeyTree] ?: "",
-                formats = p[KeyFormats] ?: DeviceConfig.DEFAULT_FORMATS.joinToString(","),
-                packet = p[KeyPacket] ?: 65536,
-                anim = p[KeyAnim] ?: animatorOn(context),
-            )
-        }.collect { ns -> s = ns; loaded = true }
+        context.dataStore.data.map { settingsFrom(it, context) }.collect { ns -> s = ns; loaded = true }
     }
 
     val status by DeviceState.status.collectAsState()
@@ -218,27 +183,8 @@ private fun MainScreen(context: Context) {
     var showSheet by remember { mutableStateOf(false) }
     var tab by remember { mutableStateOf(0) }
 
-    val savePrefs: (Settings) -> Unit = { ns ->
-        scope.launch {
-            context.dataStore.edit {
-                it[KeyAuto] = ns.auto; it[KeyHost] = ns.host; it[KeyPort] = ns.port
-                it[KeyPassword] = ns.password; it[KeyName] = ns.name; it[KeyTree] = ns.tree
-                it[KeyFormats] = ns.formats; it[KeyPacket] = ns.packet; it[KeyAnim] = ns.anim
-            }
-        }
-    }
-    val startService: (Settings) -> Unit = { ns ->
-        context.startForegroundService(Intent(context, WirelessService::class.java).apply {
-            putExtra(WirelessService.EXTRA_AUTO, ns.auto)
-            putExtra(WirelessService.EXTRA_HOST, ns.host)
-            putExtra(WirelessService.EXTRA_PORT, ns.port)
-            putExtra(WirelessService.EXTRA_PASSWORD, ns.password)
-            putExtra(WirelessService.EXTRA_NAME, ns.name)
-            putExtra(WirelessService.EXTRA_TREE, ns.tree)
-            putExtra(WirelessService.EXTRA_FORMATS, ns.formats)
-            putExtra(WirelessService.EXTRA_PACKET, ns.packet)
-        })
-    }
+    val savePrefs: (Settings) -> Unit = { ns -> scope.launch(Dispatchers.IO) { saveSettings(context, ns) } }
+    val startService: (Settings) -> Unit = { ns -> context.startForegroundService(serviceIntent(context, ns)) }
     val notifLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
         if (loaded && s.ready()) startService(s)
     }
@@ -406,9 +352,15 @@ private fun MainScreen(context: Context) {
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 )
+                OutlinedTextField(t.readCol, { t = t.copy(readCol = it.trim()) }, label = { Text(stringResource(R.string.set_read_col)) }, singleLine = true)
+                OutlinedTextField(t.dateCol, { t = t.copy(dateCol = it.trim()) }, label = { Text(stringResource(R.string.set_date_col)) }, singleLine = true)
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Switch(checked = t.anim, onCheckedChange = { t = t.copy(anim = it) })
                     Text(stringResource(R.string.set_anim), style = sans(13, color = InkDim))
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Switch(checked = t.autoStart, onCheckedChange = { t = t.copy(autoStart = it) })
+                    Text(stringResource(R.string.set_autostart), style = sans(13, color = InkDim))
                 }
                 Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
                     TextButton(onClick = { showSheet = false }) { Text(stringResource(R.string.set_cancel)) }
@@ -425,11 +377,6 @@ private fun MainScreen(context: Context) {
     }
 }
 
-private val KeyAuto = booleanPreferencesKey("auto")
-private val KeyHost = stringPreferencesKey("host")
-private val KeyPort = intPreferencesKey("port")
-private val KeyPassword = stringPreferencesKey("password")
-private val KeyName = stringPreferencesKey("name")
 @Composable
 private fun Cover(lpath: String, treeUri: String, modifier: Modifier = Modifier) {
     val context = LocalContext.current
@@ -568,7 +515,7 @@ private fun DeviceTab(context: Context, s: Settings) {
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         Cover(lpath = b.lpath, treeUri = s.tree, modifier = Modifier.size(width = 44.dp, height = 66.dp))
                         Column(Modifier.weight(1f)) {
-                    Text(b.title, style = sans(15, FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text((if (b.isRead == true) "✓ " else "") + b.title, style = sans(15, FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Spacer(Modifier.height(2.dp))
                     Text(
                         listOfNotNull(b.authors.takeIf { it.isNotEmpty() }, b.series).joinToString(" · "),
@@ -577,6 +524,30 @@ private fun DeviceTab(context: Context, s: Settings) {
                     Spacer(Modifier.height(2.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(b.lpath.substringAfterLast('/') + "  " + humanSize(b.size), style = mono(10, color = InkFaint), modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        TextButton(onClick = {
+                            val nowRead = b.isRead != true
+                            scope.launch(Dispatchers.IO) {
+                                val ok = DeviceState.markFun?.invoke(b.lpath, nowRead) ?: run {
+                                    if (tree != null) {
+                                        val st = SafInboxStore(context, tree)
+                                        val db = DeviceBooks(st)
+                                        db.load()
+                                        val hit = db.uuidOf(b.lpath) != "none"
+                                        if (hit) {
+                                            db.setRead(b.lpath, if (nowRead) true else null)
+                                            db.save()
+                                        }
+                                        hit
+                                    } else false
+                                }
+                                if (ok) reload++
+                            }
+                        }) {
+                            Text(
+                                stringResource(if (b.isRead == true) R.string.dev_unmark else R.string.dev_mark),
+                                style = sans(12, color = if (b.isRead == true) inkFor(LogKind.OK) else InkDim),
+                            )
+                        }
                         TextButton(onClick = { tree?.let { openBook(context, it, b) } }) { Text(stringResource(R.string.dev_open), style = sans(12)) }
                         TextButton(onClick = { confirm = b }) { Text(stringResource(R.string.dev_delete), style = sans(12, color = inkFor(LogKind.ERR))) }
                     }
@@ -634,13 +605,3 @@ private fun openBook(context: Context, tree: Uri, b: DeviceBookInfo) {
     }
 }
 
-private val KeyTree = stringPreferencesKey("tree")
-private val KeyFormats = stringPreferencesKey("formats")
-private val KeyPacket = intPreferencesKey("packet")
-private val KeyAnim = booleanPreferencesKey("anim")
-
-fun animatorOn(context: Context): Boolean = try {
-    android.provider.Settings.Global.getFloat(context.contentResolver, android.provider.Settings.Global.ANIMATOR_DURATION_SCALE, 1f) != 0f
-} catch (e: Exception) {
-    true
-}

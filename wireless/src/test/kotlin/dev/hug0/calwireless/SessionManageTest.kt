@@ -91,6 +91,27 @@ class SessionManageTest {
         }
     }
 
+    @Test fun setReadPersistsAndFlowsIntoIdFrame() {
+        val s = store()
+        FakeCalibre(s).use { fc ->
+            fc.start()
+            fc.call(Op.GET_INITIALIZATION_INFO, "{}")
+            fc.receive("rd/1.epub", "rd1", 3)
+            val sess = fc.session!!
+            kotlin.test.assertTrue(sess.markRead("rd/1.epub", true))
+            val frame = sess.snapshot().first { it.lpath == "rd/1.epub" }
+            assertEquals(true, frame.isRead)
+            kotlin.test.assertNotNull(frame.lastReadDate)
+            // idFrame 帶 _is_read_ 給 calibre
+            fc.call(Op.GET_BOOK_COUNT, "{}")
+            val id = fc.reader.next()!!.json
+            assertTrue(id.contains("\"_is_read_\":true") && id.contains("_last_read_date_"))
+            sess.markRead("rd/1.epub", null)
+            kotlin.test.assertNull(sess.snapshot().first { it.lpath == "rd/1.epub" }.isRead)
+            kotlin.test.assertFalse(sess.markRead("ghost.epub", true))
+        }
+    }
+
     @Test fun snapshotReflectsHarvestedBooks() {
         val s = store()
         s.write("手動丟.epub")!!.use { it.write(ByteArray(900)) }

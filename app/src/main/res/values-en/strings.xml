@@ -62,5 +62,11 @@
     <string name="dev_storage">used %1$s · free %2$s</string>
     <string name="dev_open_fail">No app can open %1$s</string>
     <string name="dev_no_tree">Pick an inbox folder on the Status tab first</string>
+    <string name="set_read_col">Read-sync column (calibre Yes/No custom column; blank=off)</string>
+    <string name="set_date_col">Read-date column (date custom column; optional)</string>
+    <string name="set_autostart">Auto-start when calibre is found (boot / network change)</string>
+    <string name="dev_mark">Mark read</string>
+    <string name="dev_unmark">Unmark</string>
+    <string name="ev_autostart">Auto-start: calibre found</string>
     <string name="chan_name">calibre wireless device</string>
 </resources>

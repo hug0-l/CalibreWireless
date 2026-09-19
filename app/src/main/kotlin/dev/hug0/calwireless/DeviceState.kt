@@ -20,6 +20,7 @@ object DeviceState {
     val logs = MutableStateFlow<List<LogLine>>(emptyList())
     val books = MutableStateFlow<List<DeviceBookInfo>>(emptyList())
     @Volatile var deleteFun: ((String) -> Boolean)? = null
+    @Volatile var markFun: ((String, Boolean?) -> Boolean)? = null
     @Volatile var resyncFun: (() -> Unit)? = null
 
     private val fmt = DateTimeFormatter.ofPattern("HH:mm:ss")

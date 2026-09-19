@@ -37,6 +37,9 @@ class WirelessService : Service() {
         DeviceState.running.value = true
         acquireLocks()
         DeviceState.deleteFun = { lp -> activeSession?.takeIf { it.alive }?.deleteBook(lp) ?: false }
+        DeviceState.markFun = { lp, r ->
+            activeSession?.takeIf { it.alive }?.let { it.markRead(lp, r) }?.also { pushBooks() } ?: false
+        }
         DeviceState.resyncFun = { try { currentSocket?.close() } catch (e: Exception) {} }
 
         val auto = intent?.getBooleanExtra(EXTRA_AUTO, true) ?: true
@@ -44,6 +47,8 @@ class WirelessService : Service() {
         val port = intent?.getIntExtra(EXTRA_PORT, 0) ?: 0
         val password = intent?.getStringExtra(EXTRA_PASSWORD).orEmpty().ifEmpty { null }
         val deviceName = intent?.getStringExtra(EXTRA_NAME).orEmpty().ifEmpty { "CalibreWireless" }
+        val readCol = intent?.getStringExtra(EXTRA_READ_COL).orEmpty().ifEmpty { null }
+        val dateCol = intent?.getStringExtra(EXTRA_DATE_COL).orEmpty().ifEmpty { null }
         val formats = DeviceConfig.parseFormats(intent?.getStringExtra(EXTRA_FORMATS))
         val packet = (intent?.getIntExtra(EXTRA_PACKET, 65536) ?: 65536).coerceIn(1024, 1 shl 20)
         val treeUriStr = intent?.getStringExtra(EXTRA_TREE)
@@ -61,6 +66,8 @@ class WirelessService : Service() {
             deviceName = "$deviceName (${android.os.Build.MODEL})",
             extensions = formats,
             maxPacketLen = packet,
+            readSyncCol = readCol,
+            readDateSyncCol = dateCol,
         )
         worker = Thread {
             val address: () -> Pair<String, Int>? = when {
@@ -177,6 +184,7 @@ class WirelessService : Service() {
     override fun onDestroy() {
         releaseLocks()
         DeviceState.deleteFun = null
+        DeviceState.markFun = null
         DeviceState.resyncFun = null
         DeviceState.books.value = emptyList()
         stopped = true
@@ -201,5 +209,7 @@ class WirelessService : Service() {
         private const val NOTIF_TRANSFER = 2
         const val EXTRA_FORMATS = "formats"
         const val EXTRA_PACKET = "packet"
+        const val EXTRA_READ_COL = "read_col"
+        const val EXTRA_DATE_COL = "date_col"
     }
 }

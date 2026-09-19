@@ -62,5 +62,11 @@
     <string name="dev_storage">已用 %1$s · 剩餘 %2$s</string>
     <string name="dev_open_fail">沒有 app 能開啟 %1$s</string>
     <string name="dev_no_tree">請先在「狀態」頁選取收件夾</string>
+    <string name="set_read_col">已讀同步欄位名（calibre 的「是/否」自訂欄，留白=關閉）</string>
+    <string name="set_date_col">閱讀日期欄位名（日期自訂欄，可留白）</string>
+    <string name="set_autostart">發現 calibre 時自動啟動（開機/換網探測）</string>
+    <string name="dev_mark">標已讀</string>
+    <string name="dev_unmark">取消已讀</string>
+    <string name="ev_autostart">自動啟動：發現 calibre</string>
     <string name="chan_name">calibre 無線裝置</string>
 </resources>

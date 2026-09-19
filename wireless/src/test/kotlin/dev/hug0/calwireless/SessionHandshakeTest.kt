@@ -132,6 +132,21 @@ class SessionHandshakeTest {
         }
     }
 
+    @Test fun readSyncColsDeclaredWhenConfigured() {
+        val cfg = DeviceConfig(deviceKind = "K", deviceName = "D", readSyncCol = "read", readDateSyncCol = "read_date")
+        FakeCalibre(store(), config = cfg).use { fc ->
+            fc.start()
+            val o = Json.parseToJsonElement(fc.initHandshake().json).jsonObject
+            assertEquals("read", o["isReadSyncCol"]!!.jsonPrimitive.content)
+            assertEquals("read_date", o["isReadDateSyncCol"]!!.jsonPrimitive.content)
+        }
+        FakeCalibre(store()).use { fc ->
+            fc.start()
+            val o = Json.parseToJsonElement(fc.initHandshake().json).jsonObject
+            assertTrue("isReadSyncCol" !in o)
+        }
+    }
+
     @Test fun unknownOpcodeDoesNotDeadlock() {
         FakeCalibre(store()).use { fc ->
             fc.start()
