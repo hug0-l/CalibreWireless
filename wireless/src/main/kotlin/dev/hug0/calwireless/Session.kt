@@ -68,7 +68,14 @@ class Session(
     }
 
     fun snapshot(): List<DeviceBookInfo> = synchronized(booksLock) {
-        books.books.map { DeviceBookInfo.from(it) }
+        books.infos()
+    }
+
+    fun markRead(lpath: String, read: Boolean?): Boolean = synchronized(booksLock) {
+        if (books.uuidOf(lpath) == "none") return false
+        books.setRead(lpath, read)
+        books.save()
+        true
     }
 
     private fun json(s: String): JsonObject =
@@ -155,6 +162,8 @@ class Session(
             put("coverHeight", config.coverHeight)
             put("maxBookContentPacketLen", config.maxPacketLen)
             put("useUuidFileNames", false)
+            config.readSyncCol?.takeIf { it.isNotBlank() }?.let { put("isReadSyncCol", it) }
+            config.readDateSyncCol?.takeIf { it.isNotBlank() }?.let { put("isReadDateSyncCol", it) }
             put("passwordHash", hash)
             put("acceptedExtensions", JsonArray(config.extensions.map { JsonPrimitive(it) }))
             putJsonObject("extensionPathLengths") { config.extensions.forEach { put(it, it.length) } }

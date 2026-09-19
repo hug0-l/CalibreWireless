@@ -7,6 +7,8 @@ data class DeviceConfig(
     val deviceName: String,
     val maxPacketLen: Int = 65536,
     val coverHeight: Int = 240,
+    val readSyncCol: String? = null,
+    val readDateSyncCol: String? = null,
     val extensions: List<String> = DEFAULT_FORMATS,
 ) {
     val extensionSet: Set<String> get() = extensions.map { it.lowercase() }.toSet()
@@ -27,6 +29,7 @@ data class DeviceConfig(
 data class DeviceBookInfo(
     val uuid: String, val lpath: String, val title: String,
     val authors: String, val series: String?, val size: Long,
+    val isRead: Boolean? = null, val lastReadDate: String? = null,
 ) {
     companion object {
         fun from(o: kotlinx.serialization.json.JsonObject): DeviceBookInfo {
@@ -41,6 +44,8 @@ data class DeviceBookInfo(
                 authors = authors,
                 series = str("series"),
                 size = str("size")?.toLongOrNull() ?: 0L,
+                isRead = (o["_is_read_"] as? kotlinx.serialization.json.JsonPrimitive)?.content?.toBooleanStrictOrNull(),
+                lastReadDate = str("_last_read_date_"),
             )
         }
     }

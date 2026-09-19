@@ -90,6 +90,22 @@ class DeviceBooks(private val store: InboxStore) {
         if (i >= 0) books[i] = slim else books.add(slim)
     }
 
+    /** read: true/false 標記，null=取消（回到未同步態） */
+    fun setRead(lpath: String, read: Boolean?) {
+        val i = books.indexOfFirst { it.str("lpath") == lpath }
+        if (i < 0) return
+        val m = books[i].toMutableMap()
+        if (read == null) {
+            m.remove("_is_read_"); m.remove("_last_read_date_")
+        } else {
+            m["_is_read_"] = JsonPrimitive(read)
+            m["_last_read_date_"] = JsonPrimitive(
+                java.time.format.DateTimeFormatter.ISO_INSTANT.format(java.time.Instant.now()),
+            )
+        }
+        books[i] = JsonObject(m)
+    }
+
     fun remove(lpath: String): String? {
         val i = books.indexOfFirst { it.str("lpath") == lpath }
         if (i < 0) return null
@@ -134,7 +150,11 @@ class DeviceBooks(private val store: InboxStore) {
             val ext = rel.substringAfterLast('.', "").lowercase()
             if (ext == "calibre" || ext !in extensions) continue
             val fallbackTitle = rel.substringAfterLast('/').substringBeforeLast('.')
-            val meta = if (ext == "epub") EpubMeta.read(store, rel) else null
+            val meta = when (ext) {
+                "epub" -> EpubMeta.read(store, rel)
+                "pdf" -> PdfMeta.read(store, rel)
+                else -> null
+            }
             val title = meta?.title?.takeIf { it.isNotBlank() } ?: fallbackTitle
             val authors = meta?.authors?.takeIf { it.isNotEmpty() } ?: listOf("Unknown")
             val o = buildJsonObject {

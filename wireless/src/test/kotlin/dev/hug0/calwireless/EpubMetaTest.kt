@@ -153,3 +153,44 @@ class EpubCoverTest {
         assertNull(EpubCover.extract(s, "y.epub"))
     }
 }
+
+class PdfMetaTest {
+    private fun store(): InboxStore {
+        val d = createTempDir(); d.deleteOnExit()
+        return FileInboxStore(d)
+    }
+
+    @Test fun literalTitleAuthorWithEscapes() {
+        val s = store()
+        s.write("a.pdf")!!.use {
+            it.write("%PDF-1.4 junk /Title (My \\(Cool\\) Book) /Author (Doe, J.; Roe, R.) trailer %%EOF".toByteArray(Charsets.ISO_8859_1))
+        }
+        val m = PdfMeta.read(s, "a.pdf")!!
+        assertEquals("My (Cool) Book", m.title)
+        assertEquals(listOf("Doe, J.", "Roe, R."), m.authors)
+    }
+
+    @Test fun hexUtf16Title() {
+        val s = store()
+        val hex = "FEFF" + "測試".map { String.format("%04X", it.code) }.joinToString("")
+        s.write("b.pdf")!!.use { it.write("/Title <$hex> /Producer (x)".toByteArray()) }
+        assertEquals("測試", PdfMeta.read(s, "b.pdf")!!.title)
+    }
+
+    @Test fun noDocinfoNull() {
+        val s = store()
+        s.write("c.pdf")!!.use { it.write("%PDF-1.7 /TitlesOnly nothing".toByteArray()) }
+        assertNull(PdfMeta.read(s, "c.pdf"))
+    }
+
+    @Test fun harvestUsesPdfMeta() {
+        val s = store()
+        s.write("doc.pdf")!!.use {
+            it.write("%PDF-1.4 /Title (廣播譯制規範) /Author (廣電總局) %%EOF".toByteArray(Charsets.UTF_8))
+        }
+        val db = DeviceBooks(s).apply { load() }
+        assertEquals(1, db.harvest(setOf("pdf")))
+        assertEquals("廣播譯制規範", db.books[0]["title"]?.jsonPrimitive?.content)
+        assertEquals("廣電總局", (db.books[0]["authors"] as kotlinx.serialization.json.JsonArray).first().jsonPrimitive.content)
+    }
+}
