@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 640" width="1280" height="640">
+  <!-- 暖石墨設備面板。一個 accent 語義：sage=在線。無漸層、無波形、無陰影。 -->
+  <rect width="1280" height="640" fill="#100F12"/>
+
+  <!-- 左：文字區 -->
+  <g font-family="ui-monospace, 'SF Mono', Menlo, 'Cascadia Mono', Consolas, monospace">
+    <circle cx="103" cy="243" r="17" fill="#8CBF94" opacity="0.14"/>
+    <circle cx="103" cy="243" r="7.5" fill="#8CBF94"/>
+    <text x="134" y="251" font-size="21" letter-spacing="5" fill="#8CBF94">CONNECTED · CALIBRE</text>
+  </g>
+  <text x="96" y="345" font-family="-apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif"
+        font-size="84" font-weight="700" letter-spacing="-2" fill="#ECE9E4">CalibreWireless</text>
+  <text x="98" y="398" font-family="-apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif"
+        font-size="27" fill="#A6A098">calibre 無線裝置同步 · LAN only · no cloud</text>
+  <text x="98" y="452" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace"
+        font-size="20" letter-spacing="2" fill="#545D68">EPUB · MOBI · AZW3 · CBZ · PDF · FB2</text>
+
+  <!-- 右：app hero 卡 replicas -->
+  <g transform="translate(692,104)">
+    <rect width="492" height="262" rx="24" fill="#1F1E22" stroke="#ECE9E4" stroke-opacity="0.07"/>
+    <!-- 狀態列 -->
+    <circle cx="52" cy="66" r="20" fill="#8CBF94" opacity="0.16"/>
+    <circle cx="52" cy="66" r="8.5" fill="#8CBF94"/>
+    <rect x="86" y="46" width="212" height="24" rx="12" fill="#ECE9E4" opacity="0.9"/>
+    <rect x="86" y="84" width="148" height="12" rx="6" fill="#545D68"/>
+    <!-- 開關 -->
+    <rect x="384" y="42" width="70" height="40" rx="20" fill="#5F8266" stroke="#ECE9E4" stroke-opacity="0.07"/>
+    <circle cx="435" cy="62" r="16" fill="#101013"/>
+    <!-- chips -->
+    <g>
+      <rect x="28" y="128" width="212" height="86" rx="14" fill="#26252B" stroke="#ECE9E4" stroke-opacity="0.06"/>
+      <rect x="48" y="146" width="52" height="9" rx="4.5" fill="#545D68"/>
+      <rect x="48" y="166" width="112" height="15" rx="7.5" fill="#ECE9E4" opacity="0.75"/>
+      <rect x="252" y="128" width="212" height="86" rx="14" fill="#26252B" stroke="#ECE9E4" stroke-opacity="0.06"/>
+      <rect x="272" y="146" width="52" height="9" rx="4.5" fill="#545D68"/>
+      <rect x="272" y="166" width="96" height="15" rx="7.5" fill="#ECE9E4" opacity="0.75"/>
+    </g>
+  </g>
+
+  <!-- 右下：事件視窗 -->
+  <g transform="translate(692,390)">
+    <rect width="492" height="176" rx="20" fill="#101013" stroke="#ECE9E4" stroke-opacity="0.07"/>
+    <g font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace" font-size="21">
+      <text x="28" y="46" fill="#545D68">19:14:02</text>
+      <text x="146" y="46" fill="#8CBF94">received  Juan 11.epub</text>
+      <text x="28" y="90" fill="#545D68">19:14:41</text>
+      <text x="146" y="90" fill="#8CBF94">served    cwtest.epub</text>
+      <text x="28" y="134" fill="#545D68">19:15:03</text>
+      <text x="146" y="134" fill="#D9A441">ejected — waiting to reconnect</text>
+    </g>
+  </g>
+</svg>
