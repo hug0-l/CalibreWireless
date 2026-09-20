@@ -17,7 +17,7 @@ class SessionBooklistTest {
         val db = DeviceBooks(s)
         lpaths.forEach { (lp, uuid) ->
             s.write(lp)!!.use { it.write(ByteArray(4) { 2 }) }
-            db.upsert(Json.parseToJsonElement("""{"uuid":"$uuid","lpath":"$lp","title":"舊$uuid","last_modified":"LM-$uuid","size":4,"authors":["甲"],"tags":[],"thumbnail":["junk",240]}""").jsonObject, lp)
+            db.upsert(Json.parseToJsonElement("""{"uuid":"$uuid","lpath":"$lp","title":"old-$uuid","last_modified":"LM-$uuid","size":4,"authors":["A"],"tags":[],"thumbnail":["junk",240]}""").jsonObject, lp)
         }
         db.save()
         return s
@@ -51,7 +51,7 @@ class SessionBooklistTest {
             fc.expectNoFrame()
             val book = fc.call(Op.NOOP, """{"priKey":1}""")
             val o = Json.parseToJsonElement(book.json).jsonObject
-            assertEquals("舊u1", o["title"]!!.jsonPrimitive.content)
+            assertEquals("old-u1", o["title"]!!.jsonPrimitive.content)
             assertTrue(o.containsKey("authors"))
             assertFalse(o.containsKey("thumbnail")) // slim 掉了
         }
@@ -66,13 +66,13 @@ class SessionBooklistTest {
             fc.reader.next() // u1 id frame
             fc.send(Op.SEND_BOOKLISTS, """{"count":1,"collections":{},"willStreamMetadata":true}""")
             fc.expectNoFrame()
-            fc.send(Op.SEND_BOOK_METADATA, """{"index":0,"count":1,"data":{"uuid":"u1","lpath":"a/A.epub","title":"新標題","last_modified":"LM2","size":4,"authors":["乙"]}}""")
+            fc.send(Op.SEND_BOOK_METADATA, """{"index":0,"count":1,"data":{"uuid":"u1","lpath":"a/A.epub","title":"NewTitle","last_modified":"LM2","size":4,"authors":["B"]}}""")
             fc.expectNoFrame()
             fc.call(Op.NOOP, "{}") // sync barrier: 前面 one-way 都已處理完才會回這題
         }
         val meta = s.readText(DeviceBooks.META_FILE)!!
-        assertTrue(meta.contains("新標題"))
-        assertFalse(meta.contains("舊u1"))
+        assertTrue(meta.contains("NewTitle"))
+        assertFalse(meta.contains("old-u1"))
     }
 
     @Test fun getBookMetadataFullFrame() {

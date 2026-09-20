@@ -24,8 +24,8 @@
 
 - 伺服器端：Mac `/Applications/calibre.app` 7.10.0（需在其偏好中啟用無線裝置存取；
   實施時核對確切開關路徑與 8.x 相容性——用戶可升級 calibre，協議 `serverProtocolVersion: 1` 多年未變）
-- 測試機：Xiaomi Mi MIX 2S（polaris, LineageOS 22 / Android 15, API 35），已接 adb
-- 書庫：Mac `~/calibre 書庫`
+- 測試機：Android 15（API 35）實機，已接 adb
+- 書庫：desktop 上的本地 calibre library
 
 ## 2. 範圍（v1）
 

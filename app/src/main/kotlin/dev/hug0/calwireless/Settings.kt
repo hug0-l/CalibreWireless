@@ -9,6 +9,7 @@ import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import dev.hug0.calwireless.saf.SafInboxStore
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 
@@ -31,10 +32,16 @@ internal data class Settings(
     val grid: Boolean = false,
     val view: Int = 0,
     val lang: String = "system",
+    val folderPath: String = "",
+    val themeMode: Int = 0,
+    val textScale: Int = 0,
 ) {
-    fun ready() = tree.isNotEmpty() && (auto || host.isNotEmpty())
-    fun folderName(): String =
-        if (tree.isEmpty()) "" else Uri.parse(tree).lastPathSegment?.substringAfter(':').orEmpty()
+    fun ready() = (tree.isNotEmpty() || folderPath.isNotEmpty()) && (auto || host.isNotEmpty())
+    fun folderName(): String = when {
+        tree.isNotEmpty() -> Uri.parse(tree).lastPathSegment?.substringAfter(':').orEmpty()
+        folderPath.isNotEmpty() -> folderPath.trimEnd('/').substringAfterLast('/')
+        else -> ""
+    }
 }
 
 internal val KeyAuto = booleanPreferencesKey("auto")
@@ -52,6 +59,9 @@ internal val KeyAutoStart = booleanPreferencesKey("auto_start")
 internal val KeyHarvest = booleanPreferencesKey("harvest")
 internal val KeyGrid = booleanPreferencesKey("grid")
 internal val KeyLang = stringPreferencesKey("lang")
+internal val KeyPath = stringPreferencesKey("folder_path")
+internal val KeyTheme = intPreferencesKey("theme")
+internal val KeyTextScale = intPreferencesKey("text_scale")
 internal val KeyView = intPreferencesKey("view")
 
 internal fun animatorOn(context: Context): Boolean = try {
@@ -77,6 +87,9 @@ internal fun settingsFrom(p: androidx.datastore.preferences.core.Preferences, co
     grid = p[KeyGrid] ?: false,
     lang = p[KeyLang] ?: "system",
     view = p[KeyView] ?: if (p[KeyGrid] == true) 1 else 0,
+    folderPath = p[KeyPath] ?: "",
+    themeMode = p[KeyTheme] ?: 0,
+    textScale = p[KeyTextScale] ?: 0,
 )
 
 /** 依 app 內語言設定包一層 localized context；"system" 則原樣 */
@@ -97,6 +110,12 @@ internal fun readLangBlocking(context: Context): String = try {
     "system"
 }
 
+internal fun buildStore(context: Context, s: Settings): InboxStore? = when {
+    s.tree.isNotEmpty() -> SafInboxStore(context, Uri.parse(s.tree))
+    s.folderPath.isNotEmpty() -> try { FileInboxStore(java.io.File(s.folderPath)) } catch (e: Exception) { null }
+    else -> null
+}
+
 internal fun readSettings(context: Context): Settings = runBlocking {
     try {
         settingsFrom(context.dataStore.data.first(), context)
@@ -112,7 +131,7 @@ internal fun saveSettings(context: Context, s: Settings) {
             it[KeyPassword] = s.password; it[KeyName] = s.name; it[KeyTree] = s.tree
             it[KeyFormats] = s.formats; it[KeyPacket] = s.packet; it[KeyAnim] = s.anim
             it[KeyReadCol] = s.readCol; it[KeyDateCol] = s.dateCol; it[KeyAutoStart] = s.autoStart
-            it[KeyHarvest] = s.harvest; it[KeyGrid] = s.grid; it[KeyLang] = s.lang; it[KeyView] = s.view
+            it[KeyHarvest] = s.harvest; it[KeyGrid] = s.grid; it[KeyLang] = s.lang; it[KeyView] = s.view; it[KeyPath] = s.folderPath; it[KeyTheme] = s.themeMode; it[KeyTextScale] = s.textScale
         }
     }
 }
@@ -124,6 +143,7 @@ internal fun serviceIntent(context: Context, s: Settings) = Intent(context, Wire
     putExtra(WirelessService.EXTRA_PASSWORD, s.password)
     putExtra(WirelessService.EXTRA_NAME, s.name)
     putExtra(WirelessService.EXTRA_TREE, s.tree)
+    putExtra(WirelessService.EXTRA_PATH, s.folderPath)
     putExtra(WirelessService.EXTRA_FORMATS, s.formats)
     putExtra(WirelessService.EXTRA_PACKET, s.packet)
     putExtra(WirelessService.EXTRA_READ_COL, s.readCol)

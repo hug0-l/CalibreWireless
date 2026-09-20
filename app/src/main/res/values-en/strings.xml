@@ -95,5 +95,21 @@
     <string name="disc_none">No calibre found (is its wireless device server running?)</string>
     <string name="col_off">Off</string>
     <string name="hint_fmt_first">Order = priority; first enabled = calibre conversion target</string>
+    <string name="sec_appearance">APPEARANCE</string>
+    <string name="theme_system">System</string>
+    <string name="theme_light">Light</string>
+    <string name="theme_dark">Dark</string>
+    <string name="theme_eink">E-Ink</string>
+    <string name="ts_normal">Normal</string>
+    <string name="ts_large">Large</string>
+    <string name="ts_xl">XL</string>
+    <string name="set_path">Or type a folder path (devices without a system picker)</string>
+    <string name="btn_grant_allfiles">Grant all-files access</string>
+    <string name="hint_adb_grant">No system grant page: adb shell appops set dev.hug0.calwireless MANAGE_EXTERNAL_STORAGE allow</string>
+    <string name="err_no_picker">No system file picker on this device — use a path below</string>
+    <string name="pick_folder">CHOOSE FOLDER</string>
+    <string name="no_subdirs">(no subfolders)</string>
+    <string name="use_this">Use &quot;%1$s&quot;</string>
+    <string name="perm_needed">All-files access not granted — SD cards &amp; some paths may be hidden</string>
     <string name="chan_name">calibre wireless device</string>
 </resources>

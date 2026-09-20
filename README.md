@@ -38,7 +38,10 @@ No cloud, no account, no internet.
   support, auto-start when calibre is found on boot/network change, wake + Wi-Fi locks,
   transfer notifications, reconnect with backoff
 - **i18n** — 繁體中文 / English, switchable in-app (or follow system)
-- Warm-graphite device-panel UI with LED status; animation toggle for e-ink
+- **E-ink ready** — 4 themes (including a pure-white **E-Ink** palette), text
+  scaling up to 1.5×, animation toggle (screen-refresh flicker control)
+- **No system picker? No problem** — on devices without a DocumentsUI
+  (e.g. Onyx/Boox), type the inbox path directly instead of using SAF
 
 ## Requirements
 
@@ -57,9 +60,10 @@ No cloud, no account, no internet.
 ## Setup (app side)
 
 1. Install the APK from [Releases](../../releases)
-2. Pick an **inbox folder** (any folder readable by other apps — readers included)
+2. Pick an **inbox folder** — the system picker, or type a path directly on
+   devices with no file picker (grant *All files access* when asked)
 3. Settings → password if you set one → keep **auto-discover** on
-4. Flip the switch. Green LED = calibre sees the device
+4. (E-ink) Settings → Appearance → **E-Ink** theme + larger text for pure-white high contrast
 
 **Send books:** select in calibre → *Send to device*.
 **Add books to library:** copy files into the inbox → device icon → *Eject* →
@@ -72,7 +76,7 @@ view refreshes — the protocol has no live device→calibre notifications).
 ```
 sdkmanager "platforms;android-35" "build-tools;35.0.0"
 ./gradlew :app:assembleRelease      # app/build/outputs/apk/release/
-./gradlew :wireless:test            # 71 protocol/engine tests (JVM, no device needed)
+./gradlew :wireless:test            # 72 protocol/engine tests (JVM, no device needed)
 ```
 
 Protocol reference and design docs: `docs/superpowers/specs/` +

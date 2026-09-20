@@ -47,11 +47,11 @@ class EpubMetaTest {
 
     @Test fun parsesTitleCreatorsSeries() {
         val s = store()
-        s.put("a.epub", epub("非人少女 &amp; 續篇", listOf("苗川采", "タカヒロ"), series = "垂涎系列", seriesIndex = "11.0"))
+        s.put("a.epub", epub("Test &amp; Escaped Title", listOf("Tester One", "Tester Two"), series = "Test Series", seriesIndex = "11.0"))
         val m = EpubMeta.read(s, "a.epub")!!
-        assertEquals("非人少女 & 續篇", m.title)
-        assertEquals(listOf("苗川采", "タカヒロ"), m.authors)
-        assertEquals("垂涎系列", m.series)
+        assertEquals("Test & Escaped Title", m.title)
+        assertEquals(listOf("Tester One", "Tester Two"), m.authors)
+        assertEquals("Test Series", m.series)
         assertEquals(11.0, m.seriesIndex)
     }
 
@@ -74,15 +74,15 @@ class EpubMetaTest {
 
     @Test fun harvestUsesRealMetadataAndFallsBack() {
         val s = store()
-        s.put("real.epub", epub("真書名", listOf("真作者"), series = "S", seriesIndex = "2"))
+        s.put("real.epub", epub("Real Title", listOf("Real Author"), series = "S", seriesIndex = "2"))
         s.put("fake.epub", "not a zip".toByteArray())
         s.put("doc.pdf", "junk".toByteArray())
         val db = DeviceBooks(s).apply { load() }
         assertEquals(3, db.harvest(setOf("epub", "pdf")))
         val byLpath = db.books.associateBy { it["lpath"]!!.jsonPrimitive.content }
         val real = byLpath["real.epub"]!!
-        assertEquals("真書名", real["title"]!!.jsonPrimitive.content)
-        assertEquals("真作者", real["authors"]!!.jsonArray.first().jsonPrimitive.content)
+        assertEquals("Real Title", real["title"]!!.jsonPrimitive.content)
+        assertEquals("Real Author", real["authors"]!!.jsonArray.first().jsonPrimitive.content)
         assertEquals("S", real["series"]!!.jsonPrimitive.content)
         assertEquals(2.0, dev.hug0.calwireless.DeviceBookInfo.from(real).seriesIndex)
         assertEquals("fake", byLpath["fake.epub"]!!["title"]!!.jsonPrimitive.content)
@@ -187,11 +187,11 @@ class PdfMetaTest {
     @Test fun harvestUsesPdfMeta() {
         val s = store()
         s.write("doc.pdf")!!.use {
-            it.write("%PDF-1.4 /Title (廣播譯制規範) /Author (廣電總局) %%EOF".toByteArray(Charsets.UTF_8))
+            it.write("%PDF-1.4 /Title (Sample Title) /Author (Sample Author) %%EOF".toByteArray(Charsets.UTF_8))
         }
         val db = DeviceBooks(s).apply { load() }
         assertEquals(1, db.harvest(setOf("pdf")))
-        assertEquals("廣播譯制規範", db.books[0]["title"]?.jsonPrimitive?.content)
-        assertEquals("廣電總局", (db.books[0]["authors"] as kotlinx.serialization.json.JsonArray).first().jsonPrimitive.content)
+        assertEquals("Sample Title", db.books[0]["title"]?.jsonPrimitive?.content)
+        assertEquals("Sample Author", (db.books[0]["authors"] as kotlinx.serialization.json.JsonArray).first().jsonPrimitive.content)
     }
 }

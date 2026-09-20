@@ -29,6 +29,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -38,6 +39,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.FlowRow
@@ -53,7 +55,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.AlertDialog
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.AlertDialogDefaults
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.ui.graphics.Color as ComposeColor
@@ -81,9 +85,15 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.rememberCoroutineScope
+import dev.hug0.calwireless.ui.LocalTextScale
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalView
+import androidx.core.view.WindowCompat
+import androidx.core.content.FileProvider
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -114,6 +124,16 @@ import dev.hug0.calwireless.ui.Panel2
 import dev.hug0.calwireless.ui.StatusLed
 import dev.hug0.calwireless.ui.inkFor
 import dev.hug0.calwireless.ui.ledFor
+import dev.hug0.calwireless.ui.paletteFor
+import dev.hug0.calwireless.ui.darkPalette
+import dev.hug0.calwireless.ui.LocalPanelColors
+import dev.hug0.calwireless.ui.LocalTextScale
+import dev.hug0.calwireless.ui.pal
+import dev.hug0.calwireless.ui.ruleW
+import dev.hug0.calwireless.ui.CardBorder
+import dev.hug0.calwireless.ui.SegSelBg
+import dev.hug0.calwireless.ui.SegSelFg
+import dev.hug0.calwireless.ui.SegUnselBg
 import dev.hug0.calwireless.DeviceConfig
 import dev.hug0.calwireless.DeviceBookInfo
 import dev.hug0.calwireless.EpubCover
@@ -132,24 +152,26 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        window.statusBarColor = AndroidColor.parseColor("#161518")
-        window.navigationBarColor = AndroidColor.parseColor("#161518")
-        setContent { DevicePanelTheme { MainScreen(this) } }
+        setContent { MainScreen(this) }
     }
 }
 
+@Composable
+@ReadOnlyComposable
 private fun sans(size: Int, weight: FontWeight = FontWeight.Normal, color: Color = Ink, tracking: Float = 0f) =
-    TextStyle(fontSize = size.sp, fontWeight = weight, color = color, letterSpacing = tracking.sp)
+    TextStyle(fontSize = (size * LocalTextScale.current).sp, fontWeight = weight, color = color, letterSpacing = tracking.sp)
 
+@Composable
+@ReadOnlyComposable
 private fun mono(size: Int, weight: FontWeight = FontWeight.Normal, color: Color = Ink) =
-    TextStyle(fontFamily = Mono, fontSize = size.sp, fontWeight = weight, color = color)
+    TextStyle(fontFamily = Mono, fontSize = (size * LocalTextScale.current).sp, fontWeight = weight, color = color)
 
 @Composable
 private fun Chip(label: String, value: String, onClick: () -> Unit) {
     Column(
         Modifier.clip(RoundedCornerShape(10.dp))
             .background(Panel)
-            .border(1.dp, BorderDim, RoundedCornerShape(10.dp))
+            .border(ruleW(), CardBorder, RoundedCornerShape(10.dp))
             .clickable(onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 10.dp),
     ) {
@@ -171,8 +193,8 @@ private fun DeviceSwitch(checked: Boolean, onChange: (Boolean) -> Unit) {
     Box(
         Modifier.width((if (pressed) 54 else 56).dp).height(32.dp)
             .clip(RoundedCornerShape(16.dp))
-            .background(if (checked) Color(0xFF5F8266) else Color(0xFF2A292F))
-            .border(1.dp, BorderDim, RoundedCornerShape(16.dp))
+            .background(if (checked) pal().switchOn else pal().switchOff)
+            .border(ruleW(), CardBorder, RoundedCornerShape(16.dp))
             .toggleable(
                 value = checked,
                 interactionSource = interaction,
@@ -185,8 +207,90 @@ private fun DeviceSwitch(checked: Boolean, onChange: (Boolean) -> Unit) {
     ) {
         Box(
             Modifier.offset(x = thumbOffset).size(26.dp).clip(CircleShape)
-                .background(if (checked) Canvas else InkDim),
+                .background(if (checked) pal().switchThumbOn else pal().switchThumbOff),
         )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun DirectoryPicker(context: Context, onDismiss: () -> Unit, onPick: (String) -> Unit) {
+    var path by remember { mutableStateOf(android.os.Environment.getExternalStorageDirectory().absolutePath) }
+    var dirs by remember { mutableStateOf<List<String>>(emptyList()) }
+    var loading by remember { mutableStateOf(true) }
+    LaunchedEffect(path) {
+        loading = true
+        dirs = withContext(Dispatchers.IO) {
+            try {
+                java.io.File(path).listFiles { f -> f.isDirectory && !f.name.startsWith(".") }
+                    ?.map { it.absolutePath }?.sorted() ?: emptyList()
+            } catch (e: Exception) {
+                emptyList()
+            }
+        }
+        loading = false
+    }
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(), containerColor = Panel) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                TextButton(enabled = path != "/storage" && path != "/", onClick = { path = path.substringBeforeLast('/') }) {
+                    Text("←", style = sans(18, color = InkDim))
+                }
+                Text(path, style = mono(11, color = InkFaint), maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+            }
+            Text(stringResource(R.string.pick_folder), style = sans(11, FontWeight.Medium, InkFaint, 2f))
+            val noPerm = Build.VERSION.SDK_INT >= 30 && try {
+                !android.os.Environment.isExternalStorageManager()
+            } catch (e: Exception) {
+                false
+            }
+            if (noPerm) {
+                Row(
+                    Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
+                        .background(pal().panel2).border(ruleW(), CardBorder, RoundedCornerShape(10.dp))
+                        .padding(10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(stringResource(R.string.perm_needed), style = sans(12, color = inkFor(LogKind.WARN)), modifier = Modifier.weight(1f))
+                    TextButton(onClick = {
+                        try {
+                            context.startActivity(
+                                Intent(android.provider.Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION, Uri.parse("package:" + context.packageName)),
+                            )
+                        } catch (e: Exception) {
+                            DeviceState.log(R.string.hint_adb_grant, kind = LogKind.WARN)
+                        }
+                    }) { Text(stringResource(R.string.btn_grant_allfiles), style = sans(12, color = InkDim)) }
+                }
+            }
+            LazyColumn(Modifier.weight(1f, false).heightIn(max = 380.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                if (loading) {
+                    item { Text("…", style = sans(14, color = InkFaint)) }
+                } else if (dirs.isEmpty()) {
+                    item { Text(stringResource(R.string.no_subdirs), style = sans(13, color = InkFaint)) }
+                }
+                items(dirs) { d ->
+                    Row(
+                        Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
+                            .background(Panel2).border(ruleW(), CardBorder, RoundedCornerShape(10.dp))
+                            .clickable { path = d }.padding(horizontal = 14.dp, vertical = 13.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text("▸", style = sans(14, color = InkDim))
+                        Text(d.substringAfterLast('/'), style = sans(15, color = Ink), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                }
+            }
+            Button(
+                onClick = { onPick(path) },
+                modifier = Modifier.fillMaxWidth().height(52.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = pal().switchOn, contentColor = pal().switchThumbOn),
+            ) {
+                Text(stringResource(R.string.use_this, path.substringAfterLast('/')), style = sans(14, FontWeight.SemiBold))
+            }
+            Spacer(Modifier.height(16.dp))
+        }
     }
 }
 
@@ -208,6 +312,7 @@ private fun MainScreen(context: Context) {
     val bookCount by DeviceState.booksCount.collectAsState()
     var showSheet by remember { mutableStateOf(false) }
     var tab by remember { mutableStateOf(0) }
+    var showDirPicker by remember { mutableStateOf(false) }
 
     val savePrefs: (Settings) -> Unit = { ns -> scope.launch(Dispatchers.IO) { saveSettings(context, ns) } }
     val startService: (Settings) -> Unit = { ns -> context.startForegroundService(serviceIntent(context, ns)) }
@@ -230,7 +335,21 @@ private fun MainScreen(context: Context) {
     }
 
     val (ledColor, ledPulse) = ledFor(status)
-
+    val palette = paletteFor(s.themeMode, isSystemInDarkTheme())
+    val scale = listOf(1f, 1.22f, 1.5f)[s.textScale.coerceIn(0, 2)]
+    val view = LocalView.current
+    LaunchedEffect(palette) {
+        (view.context as? ComponentActivity)?.window?.let { w ->
+            val dark = palette === darkPalette()
+            w.statusBarColor = android.graphics.Color.parseColor(if (dark) "#161518" else "#FFFFFF")
+            w.navigationBarColor = w.statusBarColor
+            WindowCompat.getInsetsController(w, view).isAppearanceLightStatusBars = !dark
+        }
+    }
+    androidx.compose.runtime.CompositionLocalProvider(
+        LocalPanelColors provides palette,
+        LocalTextScale provides scale,
+    ) {
     Column(
         Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -240,7 +359,7 @@ private fun MainScreen(context: Context) {
             val segColors = SegmentedButtonDefaults.colors(
                 activeContainerColor = Panel2,
                 activeContentColor = Ink,
-                inactiveContainerColor = Color(0xFF141317),
+                inactiveContainerColor = SegUnselBg,
                 inactiveContentColor = InkFaint,
             )
             SegmentedButton(selected = tab == 0, onClick = { tab = 0 }, shape = SegmentedButtonDefaults.itemShape(0, 2), colors = segColors) {
@@ -261,7 +380,7 @@ private fun MainScreen(context: Context) {
         ) {
         Column(
             Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp))
-                .background(Panel).border(1.dp, BorderDim, RoundedCornerShape(14.dp))
+                .background(Panel).border(ruleW(), CardBorder, RoundedCornerShape(14.dp))
                 .padding(16.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -296,7 +415,11 @@ private fun MainScreen(context: Context) {
                     Chip(
                         stringResource(R.string.lbl_inbox),
                         s.folderName().ifEmpty { stringResource(R.string.unconfigured) },
-                    ) { treeLauncher.launch(null) }
+                    ) {
+                        try { treeLauncher.launch(null) } catch (e: ActivityNotFoundException) {
+                            showDirPicker = true
+                        }
+                    }
                 }
                 Box(Modifier.weight(1f)) {
                     Chip(
@@ -309,7 +432,7 @@ private fun MainScreen(context: Context) {
 
         Column(
             Modifier.fillMaxWidth().weight(1f).clip(RoundedCornerShape(12.dp))
-                .background(LogBg).border(1.dp, BorderDim, RoundedCornerShape(12.dp))
+                .background(LogBg).border(ruleW(), CardBorder, RoundedCornerShape(12.dp))
                 .padding(horizontal = 12.dp, vertical = 10.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -345,6 +468,16 @@ private fun MainScreen(context: Context) {
         }
         }
         }
+    }
+
+    if (showDirPicker) {
+        DirectoryPicker(context, onDismiss = { showDirPicker = false }, onPick = { pth ->
+            showDirPicker = false
+            val ns = s.copy(folderPath = pth)
+            savePrefs(ns)
+            s = ns
+            DeviceState.log(R.string.log_folder_set, ns.folderName(), LogKind.OK)
+        })
     }
 
     if (showSheet) {
@@ -404,7 +537,7 @@ private fun MainScreen(context: Context) {
                                     ) {
                                         Text(
                                             "${srv.name} · ${srv.address}:${srv.tcpPort}",
-                                            style = mono(11, color = if (on) Color(0xFF8CBF94) else InkDim),
+                                            style = mono(11, color = if (on) pal().sage else InkDim),
                                         )
                                     }
                                 }
@@ -425,6 +558,53 @@ private fun MainScreen(context: Context) {
                     label = { Text(stringResource(R.string.set_name)) },
                     singleLine = true, colors = fieldColors(),
                 )
+                OutlinedTextField(
+                    t.folderPath, { t = t.copy(folderPath = it.trim()) },
+                    label = { Text(stringResource(R.string.set_path)) },
+                    singleLine = true, colors = fieldColors(),
+                )
+                if (t.folderPath.isNotEmpty() && Build.VERSION.SDK_INT >= 30) {
+                    val granted = try { android.os.Environment.isExternalStorageManager() } catch (e: Exception) { true }
+                    if (!granted) {
+                        OutlinedButton(onClick = {
+                            try {
+                                context.startActivity(
+                                    Intent(android.provider.Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION, Uri.parse("package:" + context.packageName)),
+                                )
+                            } catch (e: Exception) {
+                                DeviceState.log(R.string.hint_adb_grant, kind = LogKind.WARN)
+                            }
+                        }) { Text(stringResource(R.string.btn_grant_allfiles), style = sans(12, color = InkDim)) }
+                    }
+                }
+                SectionHeader(stringResource(R.string.sec_appearance))
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    listOf(
+                        stringResource(R.string.theme_system) to 0,
+                        stringResource(R.string.theme_light) to 1,
+                        stringResource(R.string.theme_dark) to 2,
+                        stringResource(R.string.theme_eink) to 3,
+                    ).forEach { (label, v) ->
+                        val on = t.themeMode == v
+                        OutlinedButton(
+                            onClick = { savePrefs(t.copy(themeMode = v)); s = t.copy(themeMode = v) },
+                            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                        ) { Text(label, style = sans(12, if (on) FontWeight.SemiBold else FontWeight.Normal, if (on) Ink else InkFaint)) }
+                    }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    listOf(
+                        stringResource(R.string.ts_normal) to 0,
+                        stringResource(R.string.ts_large) to 1,
+                        stringResource(R.string.ts_xl) to 2,
+                    ).forEach { (label, v) ->
+                        val on = t.textScale == v
+                        OutlinedButton(
+                            onClick = { savePrefs(t.copy(textScale = v)); s = t.copy(textScale = v) },
+                            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                        ) { Text(label, style = sans(12, if (on) FontWeight.SemiBold else FontWeight.Normal, if (on) Ink else InkFaint)) }
+                    }
+                }
                 SectionHeader(stringResource(R.string.sec_lang))
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     listOf(
@@ -486,7 +666,7 @@ private fun MainScreen(context: Context) {
                                 },
                                 contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 4.dp),
                             ) {
-                                Text(f, style = mono(11, color = if (on) Color(0xFF8CBF94) else InkFaint))
+                                Text(f, style = mono(11, color = if (on) pal().sage else InkFaint))
                             }
                         }
                     }
@@ -517,10 +697,11 @@ private fun MainScreen(context: Context) {
             }
         }
     }
+    }
 }
 
 @Composable
-private fun Cover(lpath: String, treeUri: String, modifier: Modifier = Modifier) {
+private fun Cover(lpath: String, store: InboxStore?, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     var bmp by remember(lpath) { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
     LaunchedEffect(lpath) {
@@ -528,8 +709,7 @@ private fun Cover(lpath: String, treeUri: String, modifier: Modifier = Modifier)
             val sink = FileCoverSink(context)
             bmp = try {
                 val f = sink.fileFor(lpath)
-                if (!f.exists() && treeUri.isNotEmpty()) {
-                    val store = SafInboxStore(context, Uri.parse(treeUri))
+                if (!f.exists() && store != null) {
                     EpubCover.extract(store, lpath)?.let { sink.putRaw(lpath, it) }
                 }
                 android.graphics.BitmapFactory.decodeFile(f.absolutePath)?.asImageBitmap()
@@ -550,10 +730,10 @@ private fun fieldColors() = OutlinedTextFieldDefaults.colors(
     focusedTextColor = Ink,
     unfocusedTextColor = Ink,
     disabledTextColor = InkFaint,
-    focusedContainerColor = ComposeColor(0xFF141317),
-    unfocusedContainerColor = ComposeColor(0xFF141317),
-    cursorColor = ComposeColor(0xFF8CBF94),
-    focusedBorderColor = ComposeColor(0xFF5F8266),
+    focusedContainerColor = pal().canvas,
+    unfocusedContainerColor = pal().canvas,
+    cursorColor = pal().sage,
+    focusedBorderColor = pal().switchOn,
     unfocusedBorderColor = BorderDim,
     focusedLabelColor = InkDim,
     unfocusedLabelColor = InkFaint,
@@ -569,11 +749,11 @@ private fun PanelSwitch(checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
     Switch(
         checked, onCheckedChange,
         colors = SwitchDefaults.colors(
-            checkedThumbColor = Color(0xFF161518),
-            checkedTrackColor = Color(0xFF8CBF94),
-            uncheckedThumbColor = InkDim,
-            uncheckedTrackColor = Color(0xFF2A292F),
-            uncheckedBorderColor = BorderDim,
+            checkedThumbColor = pal().switchThumbOn,
+            checkedTrackColor = pal().sage,
+            uncheckedThumbColor = pal().switchThumbOff,
+            uncheckedTrackColor = pal().switchOff,
+            uncheckedBorderColor = CardBorder,
         ),
     )
 }
@@ -606,18 +786,17 @@ private fun DeviceTab(context: Context, s: Settings) {
     var view by remember { mutableStateOf(s.view) }
     var sel by remember { mutableStateOf(setOf<String>()) }
     var confirmBulk by remember { mutableStateOf(false) }
-    val tree = if (s.tree.isEmpty()) null else Uri.parse(s.tree)
+    val store = remember(s.tree, s.folderPath) { buildStore(context, s) }
     val books = if (running) live else fileBooks
     LaunchedEffect(s.view) { view = s.view }
     LaunchedEffect(books.size) { DeviceState.booksCount.value = books.size }
 
     LaunchedEffect(running, reload, s.tree) {
         withContext(Dispatchers.IO) {
-            if (tree != null) {
-                val st = SafInboxStore(context, tree)
-                cap = st.usableBytes() to st.totalBytes()
+            if (store != null) {
+                cap = store.usableBytes() to store.totalBytes()
                 if (!running) {
-                    val db = DeviceBooks(st)
+                    val db = DeviceBooks(store)
                     db.load()
                     if (s.harvest) {
                         db.harvest(DeviceConfig.parseFormats(s.formats).map { it.lowercase() }.toSet())
@@ -657,8 +836,8 @@ private fun DeviceTab(context: Context, s: Settings) {
     fun applyRead(lpath: String, read: Boolean) {
         scope.launch(Dispatchers.IO) {
             val ok = DeviceState.markFun?.invoke(lpath, read) ?: run {
-                if (tree != null) {
-                    val st = SafInboxStore(context, tree)
+                if (store != null) {
+                    val st = store
                     val db = DeviceBooks(st)
                     db.load()
                     val hit = db.uuidOf(lpath) != "none"
@@ -675,8 +854,8 @@ private fun DeviceTab(context: Context, s: Settings) {
     fun applyDelete(lpath: String) {
         scope.launch(Dispatchers.IO) {
             val ok = DeviceState.deleteFun?.invoke(lpath) ?: run {
-                if (tree != null) {
-                    val st = SafInboxStore(context, tree)
+                if (store != null) {
+                    val st = store
                     val db = DeviceBooks(st)
                     db.load()
                     val hit = db.remove(lpath) != null
@@ -696,7 +875,7 @@ private fun DeviceTab(context: Context, s: Settings) {
     fun fmtLine(b: DeviceBookInfo) = b.lpath.substringAfterLast('.', "").uppercase() + " · " + humanSize(b.size)
 
     Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        if (tree == null) {
+        if (store == null) {
             Text(stringResource(R.string.dev_no_tree), style = sans(13, color = InkDim), modifier = Modifier.padding(top = 24.dp))
             return@Column
         }
@@ -705,7 +884,7 @@ private fun DeviceTab(context: Context, s: Settings) {
         if (sel.isNotEmpty()) {
             Row(
                 Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
-                    .background(Panel2).border(1.dp, BorderDim, RoundedCornerShape(10.dp))
+                    .background(Panel2).border(ruleW(), CardBorder, RoundedCornerShape(10.dp))
                     .padding(horizontal = 8.dp, vertical = 2.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -724,7 +903,7 @@ private fun DeviceTab(context: Context, s: Settings) {
         if (cap.second > 0) {
             Column(
                 Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
-                    .background(Panel).border(1.dp, BorderDim, RoundedCornerShape(10.dp))
+                    .background(Panel).border(ruleW(), CardBorder, RoundedCornerShape(10.dp))
                     .clickable { showAnalysis = true }.padding(12.dp),
             ) {
                 Row {
@@ -737,11 +916,11 @@ private fun DeviceTab(context: Context, s: Settings) {
                 Spacer(Modifier.height(7.dp))
                 Box(
                     Modifier.fillMaxWidth().height(5.dp).clip(CircleShape)
-                        .background(Color(0xFF2A292F)),
+                        .background(pal().panel2),
                 ) {
                     Box(
                         Modifier.fillMaxWidth(((cap.second - cap.first).toFloat() / cap.second).coerceIn(0.02f, 1f))
-                            .height(5.dp).clip(CircleShape).background(Color(0xFF5F8266)),
+                            .height(5.dp).clip(CircleShape).background(pal().switchOn),
                     )
                 }
             }
@@ -757,7 +936,7 @@ private fun DeviceTab(context: Context, s: Settings) {
             Box {
                 OutlinedButton(
                     onClick = { filterMenu = true },
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = if (filtering) Color(0xFF8CBF94) else InkDim),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = if (filtering) pal().sage else InkDim),
                 ) { Text("⚡", style = sans(12)) }
                 DropdownMenu(filterMenu, { filterMenu = false }, containerColor = Panel2) {
                     DropdownMenuItem(
@@ -765,11 +944,11 @@ private fun DeviceTab(context: Context, s: Settings) {
                         onClick = { filterRead = null; filterMenu = false },
                     )
                     DropdownMenuItem(
-                        text = { Text(stringResource(R.string.fil_read), style = sans(13, color = if (filterRead == true) Color(0xFF8CBF94) else InkDim)) },
+                        text = { Text(stringResource(R.string.fil_read), style = sans(13, color = if (filterRead == true) pal().sage else InkDim)) },
                         onClick = { filterRead = true; filterMenu = false },
                     )
                     DropdownMenuItem(
-                        text = { Text(stringResource(R.string.fil_unread), style = sans(13, color = if (filterRead == false) Color(0xFF8CBF94) else InkDim)) },
+                        text = { Text(stringResource(R.string.fil_unread), style = sans(13, color = if (filterRead == false) pal().sage else InkDim)) },
                         onClick = { filterRead = false; filterMenu = false },
                     )
                     androidx.compose.material3.HorizontalDivider(color = BorderDim)
@@ -780,7 +959,7 @@ private fun DeviceTab(context: Context, s: Settings) {
                     books.map { it.lpath.substringAfterLast('.', "").lowercase() }.filter { it.isNotEmpty() }
                         .distinct().sorted().forEach { ext ->
                             DropdownMenuItem(
-                                text = { Text(ext.uppercase(), style = sans(13, color = if (filterExt == ext) Color(0xFF8CBF94) else InkDim)) },
+                                text = { Text(ext.uppercase(), style = sans(13, color = if (filterExt == ext) pal().sage else InkDim)) },
                                 onClick = { filterExt = if (filterExt == ext) null else ext; filterMenu = false },
                             )
                         }
@@ -821,7 +1000,7 @@ private fun DeviceTab(context: Context, s: Settings) {
                     Column(
                         Modifier.clip(RoundedCornerShape(12.dp))
                             .background(if (selected) Panel2 else Panel)
-                            .border(1.dp, if (selected) Color(0xFF5F8266) else BorderDim, RoundedCornerShape(12.dp))
+                            .border(ruleW(), if (selected) pal().ink else CardBorder, RoundedCornerShape(12.dp))
                             .combinedClickable(
                                 onClick = { if (sel.isNotEmpty()) { if (b.lpath in sel) sel -= b.lpath else sel += b.lpath } else actionItem = b },
                                 onLongClick = { sel = setOf(b.lpath) },
@@ -829,13 +1008,13 @@ private fun DeviceTab(context: Context, s: Settings) {
                             .padding(8.dp),
                     ) {
                         Box {
-                            Cover(lpath = b.lpath, treeUri = s.tree, modifier = Modifier.fillMaxWidth().height(150.dp))
+                            Cover(lpath = b.lpath, store = store, modifier = Modifier.fillMaxWidth().height(150.dp))
                             if (selected) {
                                 Box(
                                     Modifier.align(Alignment.TopEnd).padding(3.dp).size(18.dp).clip(CircleShape)
-                                        .background(Color(0xFF5F8266)),
+                                        .background(pal().switchOn),
                                     contentAlignment = Alignment.Center,
-                                ) { Text("✓", style = sans(11, FontWeight.Bold, Color(0xFF0E1113))) }
+                                ) { Text("✓", style = sans(11, FontWeight.Bold, pal().switchThumbOn)) }
                             }
                         }
                         Spacer(Modifier.height(6.dp))
@@ -864,7 +1043,7 @@ private fun DeviceTab(context: Context, s: Settings) {
                     }
                     items(list.sortedBy { it.seriesIndex ?: Double.MAX_VALUE }, key = { "g_" + it.lpath }) { b ->
                         BookRowCard(
-                            b, b.lpath in sel, s.tree,
+                            b, b.lpath in sel, store,
                             onClick = { if (sel.isNotEmpty()) { sel = if (b.lpath in sel) sel - b.lpath else sel + b.lpath } else actionItem = b },
                             onLongClick = { sel = setOf(b.lpath) },
                         )
@@ -878,7 +1057,7 @@ private fun DeviceTab(context: Context, s: Settings) {
             ) {
                 items(shown, key = { "l_" + it.lpath }) { b ->
                     BookRowCard(
-                        b, b.lpath in sel, s.tree,
+                        b, b.lpath in sel, store,
                         onClick = { if (sel.isNotEmpty()) { sel = if (b.lpath in sel) sel - b.lpath else sel + b.lpath } else actionItem = b },
                         onLongClick = { sel = setOf(b.lpath) },
                     )
@@ -899,7 +1078,7 @@ private fun DeviceTab(context: Context, s: Settings) {
                     Text(b.lpath + "  " + humanSize(b.size), style = mono(10, color = InkFaint))
                     Spacer(Modifier.height(10.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-                        TextButton(onClick = { actionItem = null; openBook(context, tree!!, b) }) { Text(stringResource(R.string.dev_open), style = sans(12, color = InkDim)) }
+                        TextButton(onClick = { actionItem = null; openBook(context, s, b) }) { Text(stringResource(R.string.dev_open), style = sans(12, color = InkDim)) }
                         TextButton(onClick = { actionItem = null; toggleRead(b) }) {
                             Text(stringResource(if (b.isRead == true) R.string.dev_unmark else R.string.dev_mark), style = sans(12, color = InkDim))
                         }
@@ -980,8 +1159,8 @@ private fun DeviceTab(context: Context, s: Settings) {
                         LinearProgressIndicator(
                             progress = { if (totalBooks > 0) sz.toFloat() / totalBooks else 0f },
                             modifier = Modifier.weight(1f).height(5.dp).clip(CircleShape),
-                            color = Color(0xFF5F8266),
-                            trackColor = Color(0xFF2A292F),
+                            color = pal().switchOn,
+                            trackColor = pal().panel2,
                             strokeCap = androidx.compose.ui.graphics.StrokeCap.Round,
                             gapSize = 0.dp,
                             drawStopIndicator = {},
@@ -1008,19 +1187,19 @@ private fun DeviceTab(context: Context, s: Settings) {
 private fun BookRowCard(
     b: DeviceBookInfo,
     selected: Boolean,
-    treeUri: String,
+    store: InboxStore?,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
 ) {
     Row(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
             .background(if (selected) Panel2 else Panel)
-            .border(1.dp, if (selected) Color(0xFF5F8266) else BorderDim, RoundedCornerShape(12.dp))
+            .border(ruleW(), if (selected) pal().ink else CardBorder, RoundedCornerShape(12.dp))
             .combinedClickable(onClick = onClick, onLongClick = onLongClick)
             .padding(horizontal = 12.dp, vertical = 10.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Cover(lpath = b.lpath, treeUri = treeUri, modifier = Modifier.size(width = 44.dp, height = 66.dp))
+        Cover(lpath = b.lpath, store = store, modifier = Modifier.size(width = 44.dp, height = 66.dp))
         Column(Modifier.weight(1f)) {
             Text((if (b.isRead == true) "✓ " else "") + b.title, style = sans(15, FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis)
             Spacer(Modifier.height(2.dp))
@@ -1034,9 +1213,9 @@ private fun BookRowCard(
         if (selected) {
             Box(
                 Modifier.align(Alignment.CenterVertically).size(20.dp).clip(CircleShape)
-                    .background(Color(0xFF5F8266)),
+                    .background(pal().switchOn),
                 contentAlignment = Alignment.Center,
-            ) { Text("✓", style = sans(12, FontWeight.Bold, Color(0xFF0E1113))) }
+            ) { Text("✓", style = sans(12, FontWeight.Bold, pal().switchThumbOn)) }
         }
     }
 }
@@ -1055,7 +1234,7 @@ private fun ColPicker(label: String, value: String, options: List<String>, onSel
             ) {
                 Text(
                     value.ifEmpty { stringResource(R.string.col_off) }.removePrefix("#"),
-                    style = mono(12, color = if (value.isEmpty()) InkFaint else Color(0xFF8CBF94)),
+                    style = mono(12, color = if (value.isEmpty()) InkFaint else pal().sage),
                 )
             }
             DropdownMenu(menu, { menu = false }, containerColor = Panel2) {
@@ -1066,7 +1245,7 @@ private fun ColPicker(label: String, value: String, options: List<String>, onSel
                 val items = if (value.isNotEmpty() && value !in options) options + value else options
                 items.forEach { col ->
                     DropdownMenuItem(
-                        text = { Text(col.removePrefix("#"), style = mono(13, color = if (col == value) Color(0xFF8CBF94) else InkDim)) },
+                        text = { Text(col.removePrefix("#"), style = mono(13, color = if (col == value) pal().sage else InkDim)) },
                         onClick = { onSelect(col); menu = false },
                     )
                 }
@@ -1075,8 +1254,19 @@ private fun ColPicker(label: String, value: String, options: List<String>, onSel
     }
 }
 
-private fun openBook(context: Context, tree: Uri, b: DeviceBookInfo) {
-    val uri = SafInboxStore(context, tree).uriFor(b.lpath)
+private fun openBook(context: Context, s: Settings, b: DeviceBookInfo) {
+    val uri = try {
+        when {
+            s.tree.isNotEmpty() -> SafInboxStore(context, Uri.parse(s.tree)).uriFor(b.lpath)
+            s.folderPath.isNotEmpty() -> FileProvider.getUriForFile(
+                context, context.packageName + ".fileprovider",
+                java.io.File(java.io.File(s.folderPath), b.lpath),
+            )
+            else -> null
+        }
+    } catch (e: Exception) {
+        null
+    }
     if (uri == null) {
         DeviceState.log(R.string.dev_open_fail, b.lpath, LogKind.ERR)
         return

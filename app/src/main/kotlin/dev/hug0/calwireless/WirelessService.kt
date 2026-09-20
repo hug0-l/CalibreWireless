@@ -47,6 +47,7 @@ class WirelessService : Service() {
                 password = intent.getStringExtra(EXTRA_PASSWORD).orEmpty(),
                 name = intent.getStringExtra(EXTRA_NAME).orEmpty().ifEmpty { "CalibreWireless" },
                 tree = intent.getStringExtra(EXTRA_TREE).orEmpty(),
+                folderPath = intent.getStringExtra(EXTRA_PATH).orEmpty(),
                 formats = intent.getStringExtra(EXTRA_FORMATS) ?: DeviceConfig.DEFAULT_FORMATS.joinToString(","),
                 packet = intent.getIntExtra(EXTRA_PACKET, 65536),
                 readCol = intent.getStringExtra(EXTRA_READ_COL).orEmpty(),
@@ -64,7 +65,7 @@ class WirelessService : Service() {
             activeSession?.takeIf { it.alive }?.let { it.markRead(lp, r) }?.also { pushBooks() } ?: false
         }
         DeviceState.resyncFun = { try { currentSocket?.close() } catch (e: Exception) {} }
-        if (s.tree.isEmpty()) {
+        if (buildStore(this, s) == null) {
             DeviceState.status.value = Status.IDLE
             DeviceState.log(R.string.log_no_folder, kind = LogKind.ERR)
             stopSelf()
@@ -92,7 +93,7 @@ class WirelessService : Service() {
                 else -> { { s.host to s.port } }
             }
             WirelessDevice(
-                store = SafInboxStore(applicationContext, Uri.parse(s.tree)),
+                store = buildStore(applicationContext, s)!!,
                 config = config,
                 password = s.password.ifEmpty { null },
                 addressProvider = address,
@@ -235,5 +236,6 @@ class WirelessService : Service() {
         const val EXTRA_READ_COL = "read_col"
         const val EXTRA_DATE_COL = "date_col"
         const val EXTRA_HARVEST = "harvest"
+        const val EXTRA_PATH = "folder_path"
     }
 }

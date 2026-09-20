@@ -246,7 +246,7 @@ class FakeCalibre(store: InboxStore, config: DeviceConfig, password: String? = n
   1. `call(GET_INITIALIZATION_INFO, {"serverProtocolVersion":1,"passwordChallenge":"CHAL","currentLibraryName":"測試庫"})` → 應答 OK；解析 payload：`versionOK==true, canStreamBooks==true, canSendOkToSendbook==true, canAcceptLibraryInfo==true, canUseCachedMetadata==true, cacheUsesLpaths==true, canReceiveBookBinary==true, canDeleteMultipleBooks==true, canStreamMetadata==true, passwordHash==sha1hex("pw"+"CHAL")（帶密碼）或 ""（不帶）, maxBookContentPacketLen==4096, acceptedExtensions 含 "epub", extensionPathLengths["epub"]==4, ccVersionNumber 存在`
   2. `call(GET_DEVICE_INFORMATION,"{}")` → `device_info.device_store_uuid` 36 字元 uuid 格式；同 FakeCalibre 重開第二輪後 uuid 不變（driveinfo 已落檔）
   3. `call(FREE_SPACE,"{}")`→ `free_space_on_device>0`；`call(TOTAL_SPACE)` 同
-  4. `call(SET_CALIBRE_DEVICE_INFO, {device_store_uuid:...,device_name:"CalibreWireless (Mi MIX 2S)"})`→OK；driveinfo.calibre 落檔
+  4. `call(SET_CALIBRE_DEVICE_INFO, {device_store_uuid:...,device_name:"CalibreWireless (TestPhone)"})`→OK；driveinfo.calibre 落檔
   5. `call(SET_LIBRARY_INFO, {"current_library_name":"庫名"})`→OK 且事件流出現 `Connected("庫名")`
   6. `call(NOOP,"{}")`→OK keep-alive；`call(NOOP,"{ejecting:true}")`→OK 後 `Session.run` 返回、`Ejected` 事件
   7. 首訊息 `CALIBRE_BUSY {"otherDevice":"Kobo"`→ `Busy` 事件、run 返回
@@ -294,7 +294,7 @@ class FakeCalibre(store: InboxStore, config: DeviceConfig, password: String? = n
 
 **Interfaces:** `data class CalibreServer(host:String, tcpPort:Int, opdsPort:Int?)`；`Discover.hello(timeoutMs:Int=3000): CalibreServer?`、`Discover.parseReply(dgram:String, fromHost:String): CalibreServer?`；`class WirelessDevice(store, config, password, address: ()->Pair<String,Int>, emit) { fun runLoop(isStopped: ()->Boolean) }`（退避 5s→60s×2；eject/正常斷線重置 5s）
 
-- [ ] parse 測試：`"calibre wireless device client (on hugo-mac);8080,8135"` → host/tcp=8135/opds=8080；content port 空字串 `");,8135"` → tcp=8135, opds=null
+- [ ] parse 測試：`"calibre wireless device client (on somehost);8080,8135"` → host/tcp=8135/opds=8080；content port 空字串 `");,8135"` → tcp=8135, opds=null
 - [ ] UDP 實作（發 "hello" 輪詢 `BROADCAST_PORTS={54982,48123,39001,44044,59678}`，setSoTimeout 各 1s）
 - [ ] `Cli.kt`：`--host/--port/--password/--inbox DIR/--name`；缺 host:port 先 Discover；事件 println；此即 M2 驗收工具
 - [ ] **M2 活體驗證（人工，Mac 開著新升級的 calibre）**：calibre → 偏好設定 → 搜尋「无线」啟用 Android 無線裝置存取（勾「啟動時允許連線」、固定 port 8135、可設密碼）→ 終端 `./gradlew :wireless:installDist && ./wireless/build/install/wireless/wireless --inbox /tmp/cal-test` → 對照清單：①工具欄出現裝置圖標（名稱含 CalibreWireless）②選 2 本「發送到裝置」→ /tmp/cal-test 見檔+metadata.calibre ③放一本新書進 /tmp/cal-test → 「從手機新增」入庫且 metadata 對 ④裝置视图刪一本→檔消失 ⑤calibre 退出裝置→CLI 印 Ejected 後自動重連 ⑥帶錯密碼→PasswordRejected。**每項結果記錄進 commit message**；與 spec §4 有出入→先改 spec 併碼
@@ -341,13 +341,13 @@ class FakeCalibre(store: InboxStore, config: DeviceConfig, password: String? = n
 - 型別跨 task 一致：Frame/Op/InboxStore/DeviceBooks/WirelessEvent/DeviceConfig 自 T1-5 定義後引用未改名
 - 無佔位：T5 的「handler 佔位回 OK」是顯式過渡（T6-8 逐個充實），FakeCalibre 註解塊為寫法指引而非代碼缺漏
 
-## M2 活體驗證記錄（2026-09-19，calibre 9.15.0 @ Mac）
+## M2 活體驗證記錄（2026-09-19，calibre 9.15.0 @ desktop）
 
-- 探索：UDP hello → tcp 9091（fixed port）✓
+- 探索：UDP hello → calibre 的 fixed port ✓
 - 密碼：空 hash 被 DISPLAY_MESSAGE kind1 拒 → PasswordRejected ✓；正確密碼過 ✓
 - SET_LIBRARY_INFO 鍵為 `libraryName`（7.10/9.15 皆然，非 current_library_name）→ 已修正代碼+測試
-- 下行：2 本 epub 共 30MB，size 精確、metadata.calibre 中文 title/authors/tags ✓
+- 下行：2 本 epub 共 ~30MB，size 精確、metadata.calibre 中文 title/authors/tags ✓
 - 退出裝置 → 5s 自動重連 → 再 Connected ✓
 - 上行：手動丟 PDF →（重開裝置會話觸發 GET_BOOK_COUNT）harvest 入列 → 裝置視圖可見
-- 入庫：`GET_BOOK_FILE_SEGMENT` → 庫內 `Xing Ye Biao Zhun - Cai Zhi Gang.pdf` sha1 == 源檔 ✓（用戶於新增對話框改標題作者=行業標準/蔡智剛）
+- 入庫：`GET_BOOK_FILE_SEGMENT` → 庫內檔案 sha1 == 源檔位元組級一致 ✓
 - 新發現 opcode：GET_COLLECTIONS=21/UPDATE_COLLECTIONS=22（9.15 定義未使用）→ 防禦性應答已加

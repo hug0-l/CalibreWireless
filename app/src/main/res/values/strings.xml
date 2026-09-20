@@ -95,5 +95,21 @@
     <string name="disc_none">未發現 calibre（確認其無線裝置服務已啟動）</string>
     <string name="col_off">關閉</string>
     <string name="hint_fmt_first">清單順序即優先級；第一個啟用的＝calibre 轉檔目標</string>
+    <string name="sec_appearance">外觀</string>
+    <string name="theme_system">系統</string>
+    <string name="theme_light">淺色</string>
+    <string name="theme_dark">深色</string>
+    <string name="theme_eink">電子紙</string>
+    <string name="ts_normal">標準</string>
+    <string name="ts_large">大</string>
+    <string name="ts_xl">特大</string>
+    <string name="set_path">或直接輸入文件夾路徑（無系統選擇器的設備）</string>
+    <string name="btn_grant_allfiles">授予所有文件訪問權</string>
+    <string name="hint_adb_grant">系統未提供授權頁：adb shell appops set dev.hug0.calwireless MANAGE_EXTERNAL_STORAGE allow</string>
+    <string name="err_no_picker">本機無系統文件選擇器，請改用下方路徑</string>
+    <string name="pick_folder">選擇文件夾</string>
+    <string name="no_subdirs">（無子文件夾）</string>
+    <string name="use_this">使用「%1$s」</string>
+    <string name="perm_needed">未獲「所有文件」權限，SD 卡等路徑可能不可見</string>
     <string name="chan_name">calibre 無線裝置</string>
 </resources>

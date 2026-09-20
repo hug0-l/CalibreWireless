@@ -37,7 +37,9 @@ class FileInboxStore(private val root: File) : InboxStore {
             .toList()
     }
 
-    override fun size(path: String): Long? = resolve(path)?.takeIf { it.isFile }?.length()
+    fun fileFor(path: String): java.io.File? = resolve(path)?.takeIf { it.isFile }
+
+    override fun size(path: String): Long? = fileFor(path)?.length()
 
     override fun delete(path: String): Boolean = resolve(path)?.delete() ?: false
 

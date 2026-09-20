@@ -47,7 +47,7 @@ class SessionManageTest {
     }
 
     private fun FakeCalibre.receive(lpath: String, uuid: String, bytes: Int) {
-        output.write(Frame.encode(Op.SEND_BOOK, """{"lpath":"$lpath","length":$bytes,"metadata":{"uuid":"$uuid","lpath":"$lpath","title":"T$uuid","authors":["甲"],"size":$bytes}}"""))
+        output.write(Frame.encode(Op.SEND_BOOK, """{"lpath":"$lpath","length":$bytes,"metadata":{"uuid":"$uuid","lpath":"$lpath","title":"T$uuid","authors":["A"],"size":$bytes}}"""))
         output.flush()
         reader.next() // OK before binary
         sendRaw(ByteArray(bytes) { 65 })
@@ -71,7 +71,7 @@ class SessionManageTest {
             val snap = sess.snapshot()
             assertEquals(1, snap.size)
             assertEquals("m2", snap[0].uuid)
-            assertEquals("甲", snap[0].authors)
+            assertEquals("A", snap[0].authors)
             // 表落盤：新 FakeCalibre session 讀得到剩一本
             val meta = s.readText(DeviceBooks.META_FILE)!!
             assertTrue(meta.contains("b/2.epub") && !meta.contains("a/1.epub"))
@@ -159,7 +159,7 @@ class SessionManageTest {
 
     @Test fun snapshotReflectsHarvestedBooks() {
         val s = store()
-        s.write("手動丟.epub")!!.use { it.write(ByteArray(900)) }
+        s.write("manualdrop.epub")!!.use { it.write(ByteArray(900)) }
         FakeCalibre(s).use { fc ->
             fc.start()
             fc.call(Op.GET_INITIALIZATION_INFO, "{}")
@@ -167,7 +167,7 @@ class SessionManageTest {
             fc.reader.next()
             val snap = fc.session!!.snapshot()
             assertEquals(1, snap.size)
-            assertEquals("手動丟", snap[0].title)
+            assertEquals("manualdrop", snap[0].title)
             assertEquals(900L, snap[0].size)
         }
     }

@@ -31,21 +31,21 @@ class SessionSendBookTest {
     }
 
     private fun sendBook(lpath: String, bytes: ByteArray, uuid: String = "u1") =
-        """{"lpath":"$lpath","length":${bytes.size},"thisBook":0,"totalBooks":1,"willStreamBooks":true,"willStreamBinary":true,"wantsSendOkToSendbook":true,"metadata":{"uuid":"$uuid","lpath":"$lpath","title":"T$uuid","last_modified":"2026-01-01","size":${bytes.size},"authors":["甲"]}}"""
+        """{"lpath":"$lpath","length":${bytes.size},"thisBook":0,"totalBooks":1,"willStreamBooks":true,"willStreamBinary":true,"wantsSendOkToSendbook":true,"metadata":{"uuid":"$uuid","lpath":"$lpath","title":"T$uuid","last_modified":"2026-01-01","size":${bytes.size},"authors":["A"]}}"""
 
     @Test fun receiveBookWritesFileAndTable() {
         val s = store()
         FakeCalibre(s).use { fc ->
             fc.start()
             fc.call(Op.GET_INITIALIZATION_INFO, "{}")
-            val payload = sendBook("作者/書名.epub", "12345".toByteArray())
+            val payload = sendBook("Author/BookName.epub", "12345".toByteArray())
             assertEquals(Op.OK, fc.call(Op.SEND_BOOK, payload).opcode)
             fc.sendRaw("12345".toByteArray())
             fc.call(Op.NOOP, "{}") // barrier
-            assertEquals("12345", String(s.read("作者/書名.epub")!!.readBytes()))
+            assertEquals("12345", String(s.read("Author/BookName.epub")!!.readBytes()))
             val meta = s.readText(DeviceBooks.META_FILE)!!
-            assertTrue(meta.contains("作者/書名.epub"))
-            assertTrue(fc.events.any { it is WirelessEvent.BookReceived && it.lpath == "作者/書名.epub" })
+            assertTrue(meta.contains("Author/BookName.epub"))
+            assertTrue(fc.events.any { it is WirelessEvent.BookReceived && it.lpath == "Author/BookName.epub" })
         }
     }
 
